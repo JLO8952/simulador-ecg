@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Simulador ECG Clínico Avanzado</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;height:100vh;background:#e6edf3;font:14px/1.4 "Segoe UI",system-ui,sans-serif;color:#1d2b36}
+.app{display:flex;gap:12px;padding:12px;height:calc(100vh - var(--ah,0px))}
+.box{background:rgba(255,255,255,.92);border:2px solid transparent;border-radius:14px;box-shadow:0 4px 18px rgba(40,70,100,.12);backdrop-filter:blur(6px);cursor:pointer;transition:border-color .15s}
+.box:hover{border-color:#c5d6e4}.box.sel{border-color:#e07a00;box-shadow:0 0 0 3px #e07a0033,0 4px 18px rgba(40,70,100,.12)}
+#left{width:290px;display:flex;flex-direction:column;padding:12px;cursor:default}
+#left h2,#right h3{margin:0 0 6px;font-size:15px}
+#log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 2px}
+.m{max-width:90%;padding:8px 11px;border-radius:12px;white-space:pre-wrap}
+.m.ai{background:#eef3f8;align-self:flex-start}.m.u{background:#0f5f8a;color:#fff;align-self:flex-end}
+#ctxchip{font-size:12px;color:#5a6b78;margin:6px 0}
+#quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+button{font:inherit;border:1px solid #b9cbd9;background:#fff;color:#0f5f8a;border-radius:16px;padding:4px 10px;cursor:pointer}
+button:hover{background:#eaf3fa}button.pri{background:#0f5f8a;color:#fff;border-color:#0f5f8a}
+#chatRow{display:flex;gap:6px}#chatIn{flex:1;min-width:0;border:1px solid #b9cbd9;border-radius:10px;padding:8px;font:inherit}
+#center{flex:1;min-width:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,1fr);gap:10px}
+.lead{display:flex;flex-direction:column;padding:6px;min-height:0}
+.lead header{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:0 4px 3px}
+.lead header b{font-size:15px}.lead header i{color:#5a6b78;font-style:normal}
+.paper{flex:1;min-height:0;border-radius:8px;overflow:hidden;background-color:#fff5f5;
+background-image:linear-gradient(#e98f8f 1px,transparent 1px),linear-gradient(90deg,#e98f8f 1px,transparent 1px),linear-gradient(#f6cccc 1px,transparent 1px),linear-gradient(90deg,#f6cccc 1px,transparent 1px);
+background-size:25px 25px,25px 25px,5px 5px,5px 5px}
+canvas{display:block;width:100%;height:100%}
+#right{width:335px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+#right .box{padding:10px 12px}
+.big{font-size:34px;font-weight:700;color:#0f5f8a;line-height:1}.big small{font-size:13px;font-weight:400;color:#5a6b78}
+#zoomBox{flex:none;padding:10px 12px;display:flex;flex-direction:column}#zoomBox .paper{height:170px;flex:none}
+#sl .gh{font-weight:700;font-size:12px;color:#0f5f8a;margin:12px 0 2px;padding-top:8px;border-top:1px solid #e1e9f0}#sl .gh:first-child{border:0;margin-top:2px;padding-top:0}
+.sr{padding:3px 0}.sh{display:flex;justify-content:space-between;align-items:baseline;gap:6px}.sn{font-weight:600;font-size:13px}
+.sv{font-size:12px;color:#5a6b78;display:flex;align-items:center;gap:4px;white-space:nowrap}.sv b{color:#1d2b36;font-weight:700}
+.sr[data-z=out] .sv b{color:#c2570a}.sr.chg .sn:after{content:" ●";color:#e07a00;font-size:9px}
+.rs{display:none;padding:0 6px;font-size:12px;line-height:18px}.sr.chg .rs{display:inline-block}
+#sl input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:5px;background:var(--trk,#dbe4eb);outline:none;margin:7px 0 3px;padding:0;border:0}
+#sl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--th,#0f5f8a);border:3px solid #fff;box-shadow:0 1px 5px #0007;cursor:grab}
+#sl input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--th,#0f5f8a);border:3px solid #fff;box-shadow:0 1px 5px #0007;cursor:grab}
+.sr[data-z=out] input{--th:#e07a00}.sr[data-z=ok] input{--th:#1f9d55}
+.sd{font-size:11px;color:#6b7c89}
+.cl{font-size:12px;color:#5a6b78;margin:2px 0 4px}#casos{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}
+#casos button.on{background:#0f5f8a;color:#fff;border-color:#0f5f8a}
+.r2{display:grid;grid-template-columns:1fr 1.25fr;gap:10px}
+.hint{font-weight:400;font-size:11px;color:#6b7c89;margin-left:4px}
+#xbox{cursor:default;position:sticky;top:0;z-index:3;border-left:6px solid #0f5f8a;background:#fff}
+#xbox[data-sev=ok]{border-left-color:#1f9d55}#xbox[data-sev=warn]{border-left-color:#e0a000}#xbox[data-sev=alert]{border-left-color:#d6322b}
+#xh{font-weight:700;font-size:14px;margin-bottom:3px}#xt{font-size:13px;line-height:1.45}#xAsk{margin-top:7px;font-size:12px}
+.tabs{display:flex;gap:6px;margin-bottom:6px}.tabs button{font-size:12px;padding:3px 9px}.tabs button.on{background:#0f5f8a;color:#fff;border-color:#0f5f8a}
+.off{display:none!important}
+.paperx{height:170px;border-radius:8px;overflow:hidden;background:#fff5f5}
+#meas{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.leg{font-size:11px;color:#5a6b78;margin-top:5px}
+.chip{display:flex;flex-direction:column;align-items:flex-start;border-radius:10px;padding:3px 8px;font-size:12px;line-height:1.25;border-width:1px;text-align:left;background:#fff}
+.chip small{font-size:10.5px;color:#5a6b78}.chip b{margin-right:3px}
+.chip[data-s=ok]{border-color:#1f9d55;background:#eefaf2}.chip[data-s=warn]{border-color:#e0a000;background:#fff8e6}.chip[data-s=alert]{border-color:#d6322b;background:#fdeeed}
+.paper{position:relative}.cal{position:absolute;right:5px;bottom:2px;font-size:10px;color:#a05a5a;pointer-events:none}
+#pausedTag{position:absolute;left:6px;top:4px;font-size:10px;background:#e07a00;color:#fff;border-radius:6px;padding:0 5px;display:none}
+.modal{position:fixed;inset:0;background:rgba(20,40,60,.45);display:none;align-items:center;justify-content:center;z-index:9}
+.modal.on{display:flex}.card{background:#fff;border-radius:16px;padding:18px;width:min(460px,92vw);max-height:90vh;overflow:auto}
+.card input,.card textarea,.card select{width:100%;margin:2px 0 8px;padding:7px;border:1px solid #b9cbd9;border-radius:8px;font:inherit}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+#printHead{display:none}
+@media(max-width:1000px){body{height:auto}.app{flex-direction:column;height:auto}#left,#right{width:auto}#log{max-height:260px}#center{grid-template-columns:repeat(2,1fr);grid-auto-rows:150px}#zoomBox{min-height:220px}}
+#report{display:none}
+#alarm{display:none;align-items:center;gap:12px;padding:0 16px;color:#fff;font-weight:700;font-size:14px;height:44px;white-space:nowrap}
+#alTx{flex:1;overflow:hidden;text-overflow:ellipsis}.alp{font-weight:600;font-size:12px;opacity:.9}
+.lt{width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 0 12px 4px #fff9;animation:ltb .5s infinite alternate;flex:none}
+body.al1,body.al2{--ah:44px}
+body.al2 #alarm{display:flex;background:#c0121f}body.al1 #alarm{display:flex;background:#b87800}
+body.al1 .lt{animation-duration:1s}
+body.al2::after,body.al1::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:14}
+body.al2::after{box-shadow:inset 0 0 0 5px #ff2a3a,inset 0 0 90px 12px #ff2a3aaa;animation:vig .8s infinite alternate}
+body.al1::after{box-shadow:inset 0 0 0 4px #f0a500,inset 0 0 70px 8px #f0a50077;animation:vig 1.6s infinite alternate}
+body.al2 .box[data-ctx=dx],body.al2 .box[data-ctx=bpm]{animation:bxr .8s infinite alternate}
+@keyframes ltb{from{opacity:.25}to{opacity:1}}@keyframes vig{from{opacity:.35}to{opacity:1}}@keyframes bxr{from{background:#fff}to{background:#ffd9dc}}
+@media print{#alarm{display:none!important}body::after{display:none!important}}
+.tgbox{display:flex;align-items:center;gap:6px;background:#eef3f8;border-radius:10px;padding:7px 10px;margin:8px 0;font-size:13px}
+.tgst{font-size:12px;color:#41525f;padding-left:18px;margin:6px 0}.tgst li{margin:3px 0}.tgst code{background:#eef3f8;border-radius:4px;padding:0 4px}
+.tgmsg{font-size:12px;min-height:16px;margin:6px 0;color:#41525f}.tgnote{font-size:11px;color:#6b7c89;margin:8px 0}#tg_on:disabled{opacity:.5;cursor:not-allowed}
+@media print{body{background:#fff;height:auto}.app,.modal,#printHead{display:none!important}#report{display:block}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.pf{display:grid;grid-template-columns:repeat(3,1fr);gap:5px 7px}.pf label{font-size:11px;color:#5a6b78;min-width:0}.pf .w2{grid-column:span 2}.pf .w3{grid-column:1/-1}
+.pf input,.pf select,.pf textarea{width:100%;padding:5px 7px;border:1px solid #b9cbd9;border-radius:8px;font:13px "Segoe UI",system-ui,sans-serif;margin-top:2px;color:#1d2b36;background:#fff}
+.pf input:focus,.pf select:focus,.pf textarea:focus{outline:2px solid #0f5f8a55;border-color:#0f5f8a}
+#patInfo{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:8px 0}#patInfo .chip{width:100%;cursor:default;min-width:0}#patInfo .full{grid-column:1/-1;font-size:12px;color:#5a6b78}#patInfo details{grid-column:1/-1;font-size:11.5px;color:#41525f}#patInfo summary{cursor:pointer;color:#0f5f8a;font-weight:600}#patInfo li{margin:3px 0}
+#stuChip{font-size:11px;color:#5a6b78;margin:-2px 0 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stp{display:flex;flex-direction:column;gap:7px;margin-top:10px}.stp button{text-align:left;padding:8px 12px;border-radius:12px}.stp small{display:block;color:#5a6b78;font-size:11px}.stp .pri small{color:#d6e8f4}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0}.kp div{background:#eef3f8;border-radius:10px;padding:6px 8px;font-size:11px;color:#5a6b78}.kp b{display:block;font-size:18px;color:#0f5f8a}
+</style></head><body>
+<div id="alarm"><span class="lt"></span><span id="alTx"></span><span class="alp" id="alP"></span><span class="lt"></span></div>
+<div id="report"></div>
+<div class="app">
+<aside id="left" class="box"><h2 style="display:flex;justify-content:space-between;align-items:center;gap:6px"><span>Tutor IA <span id="tgHdr" style="font-size:12px"></span></span><button id="endBtn" class="pri" style="font-size:12px">🏁 Finalizar sesión</button></h2><div id="stuChip"></div><div id="log"></div><div id="ctxChip"></div><div id="quick"></div>
+<div id="chatRow"><input id="chatIn" placeholder="Pregunta sobre el ECG…"><button class="pri" id="sendBtn">Enviar</button></div></aside>
+<main id="center"></main>
+<aside id="right">
+<div class="r2"><div class="box" data-ctx="bpm"><h3>Frecuencia</h3><div class="big"><span id="bpmV">75</span> <small>lpm</small></div></div>
+<div class="box" data-ctx="dx"><h3>Diagnóstico</h3><div id="dxV" style="font-weight:600;font-size:14px"></div><div id="nnV" style="font-size:11px;color:#5a6b78;margin-top:4px"></div></div></div>
+<div class="box" data-ctx="paciente" id="patBox"><h3>Paciente simulado <span class="hint">completa los datos y observa</span></h3>
+<div class="pf"><label class="w3">Nombre<input id="p_nombre" placeholder="Ej. María Pérez"></label>
+<label>Edad (años)<input id="p_edad" type="number" min="0" max="110" placeholder="45"></label>
+<label>Altura (cm)<input id="p_altura" type="number" min="30" max="230" placeholder="165"></label>
+<label>Peso (kg)<input id="p_peso" type="number" min="2" max="300" placeholder="70"></label>
+<label>Sexo<select id="p_sexo"><option value="">—</option><option>Femenino</option><option>Masculino</option></select></label>
+<label class="w2">Presión arterial (mmHg)<input id="p_pa" placeholder="120/80"></label>
+<label class="w3">Antecedentes<textarea id="p_ant" rows="2" placeholder="Ej. hipertensión, diabetes, tabaquismo…"></textarea></label></div>
+<div id="patInfo"></div>
+<button id="pdfBtn" class="pri" style="width:100%">📄 Exportar informe en PDF</button></div>
+<div class="box" id="zoomBox" data-ctx="zoom"><div class="tabs"><button class="on" data-tab="beat">🔍 Latido anotado</button><button data-tab="live">〰️ Trazo en vivo <span id="zoomLbl">II</span></button></div>
+<div id="tabBeat"><div class="paperx"><canvas id="beatC"></canvas></div><div class="leg">▬ tu señal (derivación II) &nbsp; ┄ normal a 75 lpm &nbsp; · cuadro grande = 0,2 s</div><div id="meas"></div></div>
+<div id="tabLive" class="off"><div class="paper"><canvas id="zoomC"></canvas><span class="cal"></span></div></div></div>
+<div class="box" id="xbox" data-sev="info"><div id="xh"></div><div id="xt"></div><button id="xAsk" class="off"></button></div>
+<div class="box" id="sliderBox" data-ctx="sliders"><h3>Controles de onda <span class="hint">mueve un control y observa</span></h3>
+<div class="cl">1 · Elige un caso para explorar</div><div id="casos"></div>
+<div class="cl">2 · O ajusta tú mismo (verde = valor normal)</div>
+<div class="row" style="margin-bottom:4px"><button id="pauseBtn">⏸ Pausar trazo</button><button id="resetBtn">↺ Todo normal</button></div>
+<div id="sl"></div></div>
+</aside></div>
+
+<div class="modal" id="labModal"><div class="card" style="width:min(680px,95vw)"><h3>Laboratorio de IA</h3>
+<p style="font-size:12px;color:#5a6b78;margin:0 0 8px">Una red neuronal es una función con números ajustables (pesos) que aprende de ejemplos. Aquí ves dos, entrenadas en tu propio navegador sin internet.</p>
+<h4 style="margin:8px 0 4px">1 · Red que lee la señal</h4>
+<p style="font-size:12px;margin:0 0 6px">Primero se detecta el pico R y se recorta un latido; la red mira esa forma y la frecuencia y devuelve una probabilidad por cada tipo. Los círculos naranjas y azules son neuronas activas; las líneas, el peso de cada conexión. Prueba un caso y mira cómo reacciona:</p>
+<div class="row" id="presets" style="margin-bottom:6px"></div>
+<canvas id="netC" width="640" height="220" style="width:100%;height:auto;background:#f6f9fc;border-radius:10px"></canvas>
+<div id="sigInfo" style="font-size:12px;color:#5a6b78;margin:4px 0"></div><button id="sigTrain">Reentrenar</button>
+<p style="font-size:12px;color:#5a6b78">Se entrenó con latidos generados por este simulador, así que no reemplaza al análisis de un ECG real.</p>
+<h4 style="margin:10px 0 4px">2 · Red que entiende al tutor</h4>
+<p style="font-size:12px;margin:0 0 6px">Convierte tu pregunta en palabras y trozos de letras, y elige el término más parecido. Se reentrena sola cuando agregas términos. Escríbele algo, incluso con errores:</p>
+<input id="tTest" placeholder="ej. bradicardea, duele el pecho…"><div id="tOut"></div>
+<div id="tInfo" style="font-size:12px;color:#5a6b78;margin:4px 0"></div><button id="tTrain">Reentrenar</button>
+<div class="row" style="margin-top:10px"><button data-close>Cerrar</button></div></div></div>
+<div class="modal" id="startModal" style="z-index:30"><div class="card" style="width:min(460px,94vw)"><div style="text-align:center;font-size:36px">🫀</div><h3 style="text-align:center;margin:4px 0 8px;font-size:18px">Simulador de Electrocardiografía</h3>
+<p style="margin:0 0 10px;color:#41525f">Bienvenido/a. Para comenzar tu sesión de aprendizaje escribe tu nombre. Al terminar podrás obtener un informe con tu historial del chat, capturas de pantalla y todo lo que practicaste.</p>
+<label>Nombre completo<input id="s_name" autocomplete="name" placeholder="Ej. Ana Gómez"></label>
+<div id="s_err" style="color:#c2300a;font-size:12px;min-height:16px"></div><button class="pri" id="s_go" style="width:100%;padding:9px;border-radius:12px">Comenzar sesión</button>
+<p style="font-size:11px;color:#6b7c89;margin:8px 0 0">Todo funciona sin internet. Tu actividad se guarda solo en este equipo.</p></div></div>
+<div class="modal" id="endModal" style="z-index:25"><div class="card" style="width:min(540px,94vw)"><h3 style="font-size:17px">🏁 Sesión finalizada</h3><div id="endSum"></div>
+<div class="stp"><button class="pri" id="e_dl">⬇️ 1 · Descargar informe completo<small>Archivo .html con tu chat, capturas y actividad. Ábrelo con cualquier navegador.</small></button>
+<button id="e_pdf">📄 2 · Guardar como PDF<small>Se abre el diálogo de impresión: elige «Guardar como PDF».</small></button>
+<button id="e_tg" class="off">✈️ 3 · Enviar informe al profesor por Telegram<small id="e_tgs"></small></button>
+<div class="row" style="margin-top:6px"><button id="e_back">← Seguir en la sesión</button><button id="e_new">Iniciar nueva sesión</button></div></div>
+<p style="font-size:11px;color:#6b7c89;margin:10px 0 0">Descarga tu informe para conservarlo: incluye tu chat, capturas y actividad.</p></div></div>
+<div class="modal" id="admModal"><div class="card" style="width:min(580px,95vw)"><h3>Administración</h3>
+<div class="tabs"><button class="on" data-adm="kb">📚 Conocimiento</button><button data-adm="tg">✈️ Telegram</button></div>
+<div id="admKB"><div id="admCount" style="font-size:12px;color:#5a6b78;margin-bottom:6px"></div><input id="a_find" placeholder="Buscar en la base…"><div id="a_list" style="max-height:160px;overflow:auto;font-size:12px;margin-bottom:8px"></div>
+<label>Término (sinónimos con |)<input id="a_key" placeholder="ej. fibrilación auricular|fa"></label><label>Respuesta<textarea id="a_val" rows="4" placeholder="Admite {nombre}, {bpm}, {peso}, {diag}"></textarea></label>
+<div class="row"><button class="pri" id="a_add">Guardar término</button><button id="a_exp">Exportar .json</button><button id="a_imp">Importar .json</button><button id="a_lab">🧠 Laboratorio de IA</button><button data-close>Cerrar</button></div>
+<input type="file" id="a_file" accept=".json,application/json" hidden></div>
+<div id="admTG" class="off">
+<div class="tgbox"><span id="tgNetIc">⚪</span> <b id="tgNetTx">Comprobando conexión…</b> <button id="tg_net" style="margin-left:auto;font-size:11px">Revisar</button></div>
+<ol class="tgst"><li>En Telegram abre <b>@BotFather</b> → <code>/newbot</code> → copia el <b>token</b> que te entrega.</li><li>Pégalo aquí y pulsa <b>Verificar bot</b>.</li><li>Pulsa <b>Vincular mi chat</b> y escríbele <code>/start</code> a tu bot desde tu Telegram.</li></ol>
+<label>Token del bot<input id="tg_tok" type="password" placeholder="123456789:AAE…" autocomplete="off"></label>
+<div class="row" style="align-items:center"><button id="tg_ver">Verificar bot</button><span id="tg_bot" style="font-size:12px"></span></div>
+<label>ID de tu chat<input id="tg_chat" placeholder="se completa solo al vincular" inputmode="numeric"></label>
+<div class="row"><button id="tg_link">🔗 Vincular mi chat</button><button id="tg_test">Enviar mensaje de prueba</button></div>
+<div id="tg_msg" class="tgmsg"></div>
+<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="tg_auto" style="width:auto;margin:0"> Enviar el informe a mi Telegram al finalizar cada sesión</label>
+<button id="tg_on" class="pri" style="width:100%;padding:9px;border-radius:12px"></button>
+<p class="tgnote">Con la interacción habilitada, tu Telegram conversa con el tutor (mismas respuestas y base de conocimiento). Comandos: /ayuda · /estado · /captura · /casos · /caso bradicardia · /fc 120 · /informe. La página debe permanecer abierta. El token se guarda solo en este equipo, no dentro del archivo.</p>
+<div class="row"><button data-close>Cerrar</button></div></div></div></div>
+
+<script>
+/* ---------- Base de conocimiento (ampliable con /admin e importación) ---------- */
+const baseConocimiento={"derivaciones": "Son 12 'puntos de vista' eléctricos: 6 frontales (I, II, III, aVR, aVL, aVF) y 6 precordiales (V1–V6).", "rangos fc": "En adultos: <60 lpm bradicardia, 60–100 normal, >100 taquicardia.", "calculo fc": "Regla de 300: 300 dividido entre el número de cuadros grandes entre dos R. O 1500 / cuadros pequeños.", "diagnostico": "El diagnóstico automático clasifica solo por FC. Actual: {diag}. No sustituye la interpretación clínica.", "diag actual": "Con {bpm} lpm el estado es: {diag}.", "clasificacion automatica": "<60 lpm: Bradicardia Sinusal · 60–100: Ritmo Sinusal Normal · >100: Taquicardia Sinusal.", "limitaciones": "Este simulador es educativo: no analiza ritmo, isquemia ni intervalos, y no debe usarse para decisiones clínicas.", "region derivacion": "La derivación {lead} explora la región: {region}.", "morfologia derivacion": "En {lead} se observa la morfología normal simulada. Ajusta los sliders de P, QRS y T para ver cómo cambia.", "zoom": "El zoom amplía la derivación seleccionada ({lead}) para estudiar la forma de cada onda.", "controles": "Amplitud: tamaño general. Altura P/QRS/T y ancho QRS: forma de cada onda. Posición T: desplaza la T en el tiempo. Velocidad: mm/s del papel. Desplazamiento: línea base.", "calibracion": "Estándar: 10 mm/mV, es decir, 1 mV = 2 cuadros grandes de altura.", "velocidad papel": "Estándar: 25 mm/s. Un cuadro pequeño = 0,04 s; uno grande = 0,20 s.", "resumen paciente": "Paciente: {nombre} · {edad} años · {sexo} · {altura} cm · {peso} kg · IMC {imc} · PA {pa}. Antecedentes: {ant}.", "imc": "IMC = peso (kg) / altura (m)². Para {nombre}: {imc}.", "peso": "Peso registrado: {peso} kg. IMC: {imc}.", "presion arterial": "PA registrada: {pa}. Normal en adultos: <120/80 mmHg.", "infarto": "Elevación persistente del ST en derivaciones contiguas sugiere IAMCEST: es una emergencia tiempo-dependiente.", "bloqueo": "Retraso o interrupción de la conducción. Ej.: bloqueo AV de 1.º grado = PR >0,20 s.", "eje": "Dirección media de la despolarización ventricular. Normal: −30° a +90°; positivo en I y aVF.", "septal": "Las derivaciones V1–V2 miran el tabique interventricular.", "filtro": "Los filtros eliminan interferencia de red (50/60 Hz), deriva de línea base y ruido muscular.", "artefacto": "Señal no cardíaca: temblor, movimiento, electrodo suelto o interferencia eléctrica.", "potasio": "Hiperpotasemia: T picudas, PR largo, QRS ancho. Hipopotasemia: T aplanada, onda U.", "hola": "¡Hola! Soy tu tutor de ECG. Selecciona cualquier recuadro y te propondré preguntas.", "para que sirve el electrocardiografo|para que sirve el ecg|utilidad del ecg": "El electrocardiógrafo registra la actividad eléctrica del corazón. Sirve para detectar arritmias, signos de isquemia o infarto, trastornos de conducción, crecimiento de cavidades, efectos de fármacos y alteraciones de electrolitos. Es rápido, no invasivo y económico. Solo muestra la actividad eléctrica: no mide la fuerza de bombeo.", "como funciona el electrocardiografo|como funciona el equipo": "Al despolarizarse, el corazón genera voltajes muy pequeños (≈1 mV en la piel). Los electrodos los captan, un amplificador diferencial resta la señal entre dos puntos y elimina el ruido común, los filtros limpian la señal, un conversor analógico-digital la digitaliza y el equipo la dibuja a 25 mm/s y 10 mm/mV. Este simulador reproduce ese resultado con funciones matemáticas.", "partes del equipo|componentes": "Cables y electrodos; amplificador de instrumentación; filtros; conversor A/D; procesador y software; pantalla o impresora térmica; fuente de alimentación con aislamiento eléctrico del paciente.", "colocacion de electrodos|colocar electrodos": "Extremidades: brazo derecho, brazo izquierdo, pierna izquierda y pierna derecha (tierra). Precordiales: V1 4.º espacio intercostal, borde esternal derecho; V2 mismo nivel, borde esternal izquierdo; V4 5.º espacio, línea medioclavicular; V3 entre V2 y V4; V5 línea axilar anterior a nivel de V4; V6 línea axilar media a nivel de V4. Piel limpia y seca.", "seguridad electrica": "Verifica aislamiento del paciente y corriente de fuga baja, estado de cables y vencimiento del gel de los electrodos, y la calibración de 1 mV. Limpia con desinfectante apto y sigue siempre el manual del fabricante.", "tipos de paciente|tipos de pacientes|que tipos de pacientes existen": "Según la lectura: con bradicardia, con ritmo sinusal normal o con taquicardia. Según la edad: neonato, niño, adulto, adulto mayor, embarazada, deportista. Según el riesgo: hipertensos, diabéticos, con cardiopatía previa, etc. Usa el menú de tipos de paciente para verlos uno a uno.", "paciente bradicardia": "Lectura: FC <60 lpm. Puede ser fisiológica (deportistas entrenados, sueño) o por betabloqueantes, digoxina, hipotiroidismo, disfunción del nodo sinusal o bloqueos AV. Lo importante son los síntomas: mareo, síncope, fatiga, hipotensión. Ahora: {bpm} lpm, {diag}.", "paciente ritmo sinusal normal": "Lectura: 60–100 lpm con onda P antes de cada QRS. Un ECG normal no descarta enfermedad: puede ser normal en reposo en alguien con angina o arritmias que aparecen a ratos. Siempre se correlaciona con síntomas e historia clínica.", "paciente taquicardia": "Lectura: FC >100 lpm. La sinusal suele ser secundaria: fiebre, dolor, ansiedad, anemia, hipovolemia, hipertiroidismo, ejercicio. Otras (fibrilación auricular rápida, TSV, taquicardia ventricular) exigen mirar ritmo y QRS. Con hipotensión, dolor torácico o desmayo es urgencia.", "pacientes por edad": "Neonatos y niños tienen FC más alta (neonato ≈100–160 lpm, niño pequeño ≈80–130) y T y eje distintos. Adultos: 60–100 lpm. Adultos mayores: más bloqueos y fibrilación auricular. Embarazo: FC algo mayor. Deportistas: FC baja y voltajes altos pueden ser normales.", "pacientes de riesgo": "Merecen más atención: hipertensión, diabetes, tabaquismo, dislipidemia, antecedentes familiares de cardiopatía o muerte súbita, cardiopatía previa, fármacos que alargan el QT, alteraciones de electrolitos y enfermedad renal.", "sintoma sincope|mareo|desmayo|sincope": "Síncope o mareo: pérdida breve de conciencia por menos flujo al cerebro. En el ECG se buscan bradicardia marcada, pausas, bloqueos AV, QT largo, taquiarritmias, preexcitación o patrón de Brugada. Un síncope con ECG anormal requiere valoración médica.", "sintoma palpitaciones|palpitaciones": "Sensación de latido rápido, irregular o fuerte. Pueden ser extrasístoles, fibrilación auricular, TSV, o ansiedad y cafeína. Un ECG de reposo puede salir normal si el episodio ya pasó; por eso se usa Holter o monitor de eventos.", "sintoma disnea|disnea|falta de aire": "Falta de aire. El ECG puede mostrar fibrilación auricular, sobrecarga o hipertrofia, bloqueos o isquemia, pero por sí solo no define la causa: se complementa con radiografía, laboratorio y ecocardiograma.", "sintoma fatiga|fatiga|cansancio|debilidad": "El cansancio puede relacionarse con bradicardia, bloqueos, insuficiencia cardíaca, anemia, trastornos tiroideos o electrolitos. El ECG orienta, y se completa con otros estudios.", "signos de alarma|urgencia": "Requieren atención urgente: dolor torácico opresivo, síncope, falta de aire intensa, FC muy alta o muy baja con mareo o hipotensión, elevación de ST, QRS ancho con pulso rápido o pausas largas. Este simulador es educativo y no sustituye a un profesional.", "metodo lectura ecg|como leer un ecg|leer ecg": "Método ordenado: 1) calibración y velocidad; 2) frecuencia; 3) ritmo (¿P antes de cada QRS?); 4) eje; 5) intervalos PR, QRS y QT; 6) morfología: P, Q patológicas, R, ST y T; 7) integrar con síntomas. Hazlo siempre en el mismo orden.", "bloqueo de rama": "Retraso de la conducción por una rama del haz de His; produce QRS ancho (≥0,12 s).", "qt largo": "QTc prolongado: riesgo de torsades de pointes. Causas: fármacos, hipopotasemia, hipocalcemia o congénito.", "troponina": "Proteína liberada por el músculo cardíaco lesionado; su elevación apoya el diagnóstico de infarto junto con ECG y clínica.", "taquicardia ventricular": "Tres o más latidos ventriculares seguidos a >100 lpm, con QRS ancho. Puede ser inestable y es una urgencia.", "hipertrofia ventricular": "Engrosamiento del ventrículo, con voltajes altos del QRS y cambios de ST-T. Se asocia a hipertensión y valvulopatías.", "red neuronal|redes neuronales|inteligencia artificial|ia": "Una red neuronal es una función con muchos números ajustables (pesos) que aprende de ejemplos. En este simulador hay dos: una lee la señal del ECG (detecta el pico R, recorta el latido y clasifica el ritmo) y otra interpreta tus preguntas para encontrar el término correcto. Ábrelas en el botón 🧠 IA. Son herramientas de enseñanza entrenadas con datos simulados, no con pacientes reales.", "sintoma dolor toracico|dolor toracico|dolor de pecho|duele el pecho|me duele el pecho": "En dolor torácico el ECG busca elevación o descenso de ST, T invertidas y ondas Q. Un primer ECG normal no descarta infarto: se repite y se acompaña de troponinas. Dolor opresivo con sudor, náuseas o irradiación al brazo o mandíbula es urgencia.", "bioelectricidad": "Es la actividad eléctrica que generan las células excitables (nervios, músculos y corazón) por el movimiento de iones como Na⁺, K⁺, Ca²⁺ y Cl⁻ a través de su membrana. Es la fuente de señales como el ECG, el EEG y el EMG.", "potencial de reposo": "Diferencia de voltaje entre el interior y el exterior de una célula en reposo; en el miocardio ventricular ronda los −90 mV. Lo mantienen la bomba Na⁺/K⁺ y la permeabilidad al potasio.", "potencial de accion|potenciales de accion": "Cambio rápido del voltaje de membrana. En el miocardio ventricular tiene cinco fases: 0 despolarización rápida (entrada de Na⁺), 1 repolarización inicial, 2 meseta (entrada de Ca²⁺), 3 repolarización (salida de K⁺) y 4 reposo. La suma de los potenciales de muchas células produce el ECG.", "señales biomedicas|senales biomedicas|señal biomedica": "Son registros de variables fisiológicas: eléctricas (ECG, EEG, EMG), mecánicas (presión, flujo), térmicas, químicas u ópticas (oximetría). Suelen ser de baja amplitud y baja frecuencia: el ECG de superficie ronda 1 mV y 0,05–150 Hz.", "filtrado|filtro paso alto|filtro paso bajo|filtro notch": "Paso alto (≈0,05–0,5 Hz) elimina la deriva de la línea base; paso bajo (≈40–150 Hz) reduce el ruido muscular y de alta frecuencia; notch elimina los 50/60 Hz. Filtrar de más distorsiona ST y QRS, por eso el modo diagnóstico usa más ancho de banda que el modo monitor.", "aliasing": "Distorsión que aparece cuando se muestrea por debajo de Nyquist: las frecuencias altas se ven como bajas. Se evita con un filtro antialiasing antes del conversor.", "arquitectura general de equipos biomedicos|arquitectura de equipos biomedicos|arquitectura": "Cadena típica: sensor o electrodo → protección y aislamiento del paciente → amplificador → filtros → conversor A/D → procesador → pantalla, impresora o memoria, con su fuente de alimentación. La parte aislada protege al paciente de corrientes de fuga.", "corriente electrica en el cuerpo humano|efectos de la corriente electrica": "Los efectos dependen de la corriente (no del voltaje), la frecuencia, el tiempo y el trayecto. Con 50/60 Hz, como orden de magnitud: ≈1 mA se percibe, ≈10 mA impide soltar el objeto y ≈75–100 mA a través del tórax puede causar fibrilación ventricular.", "parte aplicada|partes aplicadas|tipo b|tipo bf|tipo cf": "Se clasifican por protección: B (cuerpo), BF (entrada flotante, aislada de tierra) y CF (flotante con la máxima protección, apta para contacto cardíaco directo).", "iec 60601-1|iec 60601|60601": "Norma internacional de seguridad básica y desempeño esencial de equipos electromédicos. Define clasificaciones (clase de protección, tipo de parte aplicada), límites de fuga, rigidez dieléctrica, requisitos mecánicos y gestión de riesgo, tanto para diseño como para certificación.", "iec 62353|62353": "Norma para las pruebas recurrentes y posteriores a reparaciones de equipos electromédicos en uso. Indica qué ensayos hacer (inspección visual, continuidad de tierra, corrientes de fuga, funcionalidad) y con qué periodicidad, según el riesgo.", "gestion del riesgo tecnologico|gestion del riesgo|iso 14971": "Proceso sistemático para identificar peligros, estimar y evaluar riesgos, controlarlos y vigilarlos durante el ciclo de vida del equipo. ISO 14971 es la norma de referencia en dispositivos médicos; en hospitales se apoya en inventario, mantenimiento y reporte de incidentes.", "pruebas de seguridad electrica|prueba de seguridad electrica": "Se hacen con un analizador de seguridad eléctrica: inspección visual, resistencia del conductor de tierra, corrientes de fuga (tierra, envolvente, paciente) y verificación funcional. Los resultados se comparan con los límites de IEC 60601-1 o IEC 62353 y se registran en un informe.", "anatomia cardiaca|anatomia del corazon": "El corazón tiene cuatro cavidades: aurículas (reciben sangre) y ventrículos (la expulsan). Sus válvulas son tricúspide, pulmonar, mitral y aórtica. La pared tiene endocardio, miocardio y epicardio, y está rodeada por el pericardio.", "sistema de conduccion|conduccion cardiaca": "Orden del impulso: nodo sinusal (marcapasos natural, 60–100 lpm) → aurículas → nodo AV (retraso fisiológico) → haz de His → ramas derecha e izquierda → fibras de Purkinje → ventrículos. Si falla el nodo sinusal, puede tomar el mando el nodo AV (40–60 lpm) o los ventrículos (20–40 lpm).", "nodo av|nodo auriculoventricular": "Retrasa el impulso cerca de 0,1 s para que las aurículas terminen de vaciarse antes de contraer los ventrículos. Se refleja en el intervalo PR. Su frecuencia propia de escape es de 40–60 lpm.", "haz de his|purkinje|fibras de purkinje": "El haz de His lleva el impulso del nodo AV a las ramas derecha e izquierda; las fibras de Purkinje lo reparten rápido por los ventrículos, lo que da un QRS estrecho.", "derivaciones aumentadas|avr avl avf": "aVR, aVL y aVF son unipolares aumentadas: comparan un miembro con el promedio de los otros dos. Con I, II y III forman el plano frontal. aVR normalmente es negativa.", "ecg de 12 derivaciones|12 derivaciones": "Combina 6 derivaciones frontales y 6 precordiales para ver el corazón desde 12 ángulos y localizar el territorio afectado: inferior (II, III, aVF), anterior (V1–V4) y lateral (I, aVL, V5–V6).", "patologias|patologias del ecg|patologias cardiacas": "Alteraciones frecuentes: arritmias (fibrilación auricular, flutter, taquicardias), bloqueos AV y de rama, isquemia e infarto (cambios de ST y T, ondas Q), hipertrofias, pericarditis y alteraciones de electrolitos. Pregúntame por una en concreto.", "diagrama de bloques del electrocardiografo|diagrama de bloques": "Electrodos y cable paciente → protección contra desfibrilación y aislamiento → amplificador de instrumentación → filtros → conversor A/D → microprocesador → pantalla, impresora térmica y memoria; con fuente de alimentación y batería. Un circuito de pierna derecha reduce el ruido común.", "circuito de pierna derecha|pierna derecha": "El electrodo de pierna derecha no mide: se conecta a un circuito que inyecta una señal opuesta al ruido de modo común para reducirlo y mejora la seguridad.", "manual de servicio|manuales de servicio": "Documento técnico del fabricante con esquemas, lista de piezas, calibración, ajustes, diagnóstico de fallas, pruebas y códigos de error. Sirve para reparar y mantener; el manual de usuario, en cambio, explica la operación.", "mantenimiento correctivo|mantenimiento predictivo": "Correctivo: se repara después de la falla. Predictivo: se vigilan variables para anticipar la falla. Preventivo: se programa antes. En equipos biomédicos se combinan según su criticidad.", "cardioversion|cardioversion sincronizada": "Choque de menor energía sincronizado con la onda R para no caer en el período vulnerable (onda T). Se usa en arritmias con pulso, como fibrilación auricular, flutter o taquicardias inestables.", "energia del desfibrilador|joules|julios": "Se mide en julios (J). Como referencia, los bifásicos usan en adultos entre 120 y 200 J según el fabricante, y los monofásicos 360 J; la cardioversión usa menos energía según el ritmo. Siempre se sigue el protocolo vigente.", "onda bifasica|onda monofasica|bifasico|monofasico": "Forma de la corriente del choque: monofásica (un solo sentido) o bifásica (cambia de sentido). La bifásica es igual de eficaz con menos energía y menos daño al miocardio, por eso es la más usada.", "analizador de desfibriladores|analizador de desfibrilador": "Equipo de prueba que mide la energía entregada, el tiempo de carga, la forma de onda y la sincronía con la onda R; en DEA simula ritmos para verificar el algoritmo. Usa una carga de 50 Ω que simula el tórax.", "verificacion funcional del desfibrilador|verificacion funcional|prueba del desfibrilador": "Incluye inspección visual, batería, tiempo de carga a energía máxima, exactitud de la energía entregada, sincronización, alarmas y registros, parches o palas, y autochequeo. Se compara con la tolerancia del fabricante o de la norma (por ejemplo IEC 60601-2-4) y se documenta.", "seguridad al desfibrilar|todos fuera": "Antes del choque: avisar «todos fuera» y confirmar que nadie toque al paciente ni la cama. Evitar charcos, oxígeno acumulado sobre el pecho y superficies metálicas conductoras, y asegurar buen contacto de los parches.", "parches y palas|parches|palas": "Los parches adhesivos permiten manos libres y buen contacto; las palas requieren gel y presión. Posiciones habituales: anterolateral (bajo la clavícula derecha y línea axilar izquierda) o anteroposterior.", "tipos de marcapasos": "Temporales (externos transcutáneos o transvenosos) y permanentes (implantables). Según las cámaras: unicameral, bicameral (aurícula y ventrículo) y biventricular (resincronización). También existen marcapasos sin cables.", "codigo nbg|codigo de marcapasos|modos de estimulacion": "Código de letras: 1.ª cámara estimulada (A, V, D), 2.ª cámara sensada (A, V, D, O), 3.ª respuesta (I inhibe, T dispara, D ambas, O ninguna) y 4.ª modulación de frecuencia (R). Ejemplos: AAI, VVI, DDD, VOO, DDDR.", "vvi|modo vvi": "Estimula y sensa el ventrículo; si detecta actividad propia, inhibe la salida. Es un modo básico, sin sincronía entre aurícula y ventrículo.", "ddd|modo ddd": "Sensa y estimula ambas cámaras: sigue a la aurícula para mantener la sincronía AV y estimula el ventrículo cuando hace falta. Es el modo fisiológico más usado en bloqueo AV con nodo sinusal sano.", "aai|modo aai": "Estimula y sensa la aurícula. Sirve en disfunción sinusal cuando la conducción AV es normal.", "voo|modo asincrono": "Estimula el ventrículo sin sensar: ignora la actividad propia. Se usa de forma temporal, por ejemplo con interferencia durante cirugía, y puede competir con el ritmo propio.", "umbral de captura|captura": "Mínima energía (voltaje o corriente) con la que el impulso del marcapasos despolariza el miocardio de forma constante. En el ECG, cada espiga seguida de QRS (o P) indica captura. Se programa un margen de seguridad sobre el umbral.", "sensado|sensibilidad del marcapasos|umbral de sensado": "Capacidad del marcapasos para detectar la actividad propia del corazón (en mV). Un sensado insuficiente (undersensing) lo hace estimular cuando no debe; un sensado excesivo (oversensing) inhibe la estimulación por ruido o miopotenciales.", "fallas del marcapasos|falla de captura|falla de sensado|falla de salida": "Falla de captura: hay espiga sin respuesta del miocardio. Falla de sensado: no detecta (undersensing) o detecta de más (oversensing). Falla de salida: no hay espiga. Causas: cable desplazado o roto, batería agotada o umbral alto.", "pruebas funcionales de marcapasos|programador de marcapasos|analizador de marcapasos": "Se evalúan con el programador del fabricante (telemetría) y con analizadores o simuladores: batería, impedancia de electrodos, umbral de captura, sensado, frecuencia y modo programado. En un marcapasos externo se verifican espiga, amplitud, frecuencia y sensibilidad.", "mantenimiento de marcapasos": "En marcapasos externos temporales: revisar batería, cables y conectores, valores de salida y sensibilidad, alarmas, limpieza y seguridad eléctrica según el fabricante. Los implantables no se reparan: los controla el equipo de electrofisiología con el programador.", "eri|eol|bateria del marcapasos": "ERI (indicador de reemplazo electivo) avisa que se acerca el fin de la batería; EOL (fin de servicio) indica agotamiento. La vida de la batería suele ser de varios años según el uso.", "interferencia electromagnetica en marcapasos|resonancia magnetica y marcapasos": "Campos fuertes (resonancia magnética, bisturí eléctrico, algunos equipos) pueden afectar al marcapasos. Existen dispositivos condicionales para resonancia; se sigue siempre el protocolo y la autorización del especialista.", "diferencia entre macrochoque y microchoque|macrochoque vs microchoque": "Macrochoque: la corriente entra por la piel y atraviesa el cuerpo; hacen falta decenas de miliamperios (≈75–100 mA) para riesgo de fibrilación. Microchoque: la corriente llega directo al corazón por un catéter o electrodo intracardíaco; bastan decenas de microamperios. Por eso las partes aplicadas al corazón son tipo CF.", "ayuda|que me puedes enseñar|que puedes enseñar|que sabes|que temas hay|temas": "Puedo explicarte para qué sirve y cómo funciona el electrocardiógrafo, los tipos de paciente según la lectura, los síntomas y su relación con el ECG, cómo leer un ECG, bioinstrumentación (señales, amplificación, filtrado), seguridad eléctrica, desfibriladores y marcapasos. Usa los botones del menú, escribe /glosario para ver todos los términos o hazme una pregunta con tus palabras.", "flutter auricular|aleteo auricular|flutter": "Arritmia auricular organizada con ondas en \"dientes de sierra\" a unos 300 por minuto. Si el nodo AV deja pasar uno de cada dos impulsos, la frecuencia ventricular ronda los 150 lpm.", "wolff parkinson white|wpw|preexcitacion": "Existe una vía accesoria entre aurículas y ventrículos. En el ECG se ve PR corto y una onda delta (subida lenta al inicio del QRS).", "pericarditis": "Inflamación del pericardio. Suele mostrar elevación difusa y cóncava del ST en varias derivaciones y descenso del segmento PR. Produce dolor torácico que cambia con la respiración o la postura.", "bloqueo av de tercer grado|bloqueo completo|bloqueo av completo": "Las aurículas y los ventrículos laten de forma independiente: las ondas P y los QRS no se relacionan. La frecuencia ventricular es baja y puede causar mareo o síncope.", "gel conductor|gel del electrodo|gel": "Reduce la resistencia entre la piel y el electrodo para captar mejor la señal. Si se seca, aparece ruido o línea base inestable.", "hipocalcemia|calcio bajo": "Calcio bajo en sangre. Alarga el segmento ST y, con ello, el intervalo QT.", "resumen rapido|estado actual": "{nombre} tiene {bpm} lpm: {diag}. Peso registrado: {peso} kg.", "bioinstrumentación|bio instrumentación": "Desarrollo y aplicación de equipos de medición y diagnóstico para sistemas biológicos. Sirve para transformar variables fisiológicas en señales eléctricas analizables.", "biopotencial|potencial biológico|biopotenciales": "Voltaje eléctrico generado por los tejidos vivos como músculos o nervios. Un ejemplo es la señal eléctrica del corazón que se lee en un electrocardiógrafo.", "transductor|transductores": "Dispositivo que convierte un tipo de energía física en otra diferente. En medicina suele transformar variables como presión o temperatura en una señal eléctrica proporcional.", "sensor|sensores": "Elemento primario de un sistema de medición que detecta una variable física o química del paciente. Es la parte del equipo que entra en contacto directo con la magnitud a medir.", "electrocardiograma|ecg|ekg": "Representación gráfica de la actividad eléctrica del corazón en función del tiempo. Permite evaluar el ritmo y diagnosticar patologías.", "amplificador de instrumentación|amplificador de biopotenciales|amplificacion|amplificador": "Circuito electrónico diseñado para aumentar el tamaño de señales fisiológicas muy pequeñas. Destaca por tener una alta impedancia de entrada y rechazar ruidos indeseados.", "razón de rechazo en modo común|cmrr|rechazo en modo común|rechazo de modo comun": "Medida que indica la capacidad de un amplificador para ignorar señales de ruido presentes en ambas entradas simultáneamente. A mayor valor, más limpia será la señal fisiológica obtenida.", "ruido de línea|interferencia de red|ruido de 60hz|ruido de 50hz|ruido de 50 60 hz|ruido de red": "Interferencia electromagnética generada por la red de suministro eléctrico del hospital o clínica. Se infiltra en los equipos médicos y deforma la lectura de señales pequeñas.", "filtro pasa banda|filtro pasabanda": "Circuito o algoritmo que permite el paso de un rango específico de frecuencias y bloquea las demás. Es vital para limpiar señales biomédicas eliminando ruidos de alta frecuencia y derivas de línea base.", "frecuencia de muestreo|tasa de muestreo|nyquist": "Cantidad de veces por segundo que se toma el valor de una señal analógica para convertirla en digital. Debe ser lo suficientemente alta para no perder información clínica relevante de la onda.", "convertidor analógico a digital|adc|conversor ad|conversion analogica digital|conversor analogico digital": "Componente que transforma una señal eléctrica continua en números discretos que un microprocesador puede entender. Permite procesar y mostrar las mediciones en la pantalla de un equipo.", "analizador de seguridad eléctrica|analizador de seguridad": "Dispositivo de precisión utilizado para medir corrientes de fuga y conexiones a tierra bajo normativas clínicas. Asegura que el paciente no corra ningún riesgo de electrocución durante el examen.", "corriente de fuga|corriente de escape|corrientes de fuga": "Corriente eléctrica no deseada que fluye desde un equipo médico hacia la tierra o hacia el paciente. Su límite está estrictamente regulado para prevenir riesgos de choque eléctrico en entornos clínicos.", "macrochoque|macro choque": "Descarga eléctrica de alta corriente aplicada en el exterior del cuerpo a través de la piel intacta. Puede causar quemaduras o paros cardíacos dependiendo de la magnitud y el recorrido de la corriente.", "microchoque|micro choque": "Corriente eléctrica mínima que llega directamente al miocardio mediante catéteres o electrodos internos. Cantidades minúsculas de corriente pueden ser suficientes para inducir una fibrilación ventricular fatal.", "conexión a tierra|tierra de protección|puesta a tierra": "Conductor de baja resistencia que conecta el chasis metálico de un equipo médico con el suelo. Sirve para desviar corrientes de fuga y evitar que el personal o los pacientes reciban descargas.", "aislamiento eléctrico|barrera de aislamiento|aislamiento galvánico": "Técnica de diseño en equipos médicos que impide el flujo directo de corriente entre el paciente y la red eléctrica. Usa transformadores o acopladores ópticos para maximizar la seguridad.", "desfibrilador|desfibriladores|desfibrilacion": "Equipo médico que administra una descarga eléctrica controlada al corazón para restablecer su ritmo normal. Se utiliza en emergencias de paro cardíaco o fibrilación ventricular.", "desfibrilador externo automático|dea|aed": "Dispositivo portátil que diagnostica arritmias letales y guía al usuario para aplicar una descarga si es necesario. Está diseñado para que personas sin entrenamiento médico avanzado puedan salvar vidas.", "marcapasos|marcapaso|estimulacion cardiaca": "Dispositivo implantable que envía impulsos eléctricos para asegurar latidos a un ritmo adecuado. Su uso es vital cuando el sistema eléctrico natural del corazón falla.", "onda p|onda p ecg": "Primera pequeña elevación en el trazado que representa la despolarización de las aurículas. Indica que el impulso eléctrico comenzó correctamente en el nodo sinusal.", "complejo qrs|qrs": "Conjunto de ondas que refleja la despolarización rápida y potente de los ventrículos. Su forma estrecha o ancha ayuda a localizar el origen de una arritmia.", "onda t|onda t ecg": "Deflexión que sigue al complejo qrs y representa la repolarización de los ventrículos. Cambios en su forma pueden indicar falta de oxígeno o alteraciones en los electrolitos.", "derivación bipolar|derivaciones bipolares|triangulo de einthoven|einthoven": "Registro de la diferencia de potencial eléctrico entre dos electrodos colocados en las extremidades del paciente. Las tres principales forman el triángulo de Einthoven para el análisis cardíaco básico.", "derivación precordial|derivaciones precordiales": "Registro eléctrico tomado por electrodos colocados directamente sobre el pecho del paciente. Proporcionan una visión tridimensional de la actividad cardíaca en el plano horizontal.", "fotopletismografía|ppg": "Técnica óptica no invasiva que detecta los cambios de volumen de sangre en los microvasos de los tejidos. Es la base tecnológica detrás de los sensores de pulso que se colocan en el dedo.", "oximetría de pulso|pulsioximetría|oxímetro": "Método para medir de forma continua y no invasiva la saturación de oxígeno en la sangre arterial. Utiliza luz roja e infrarroja para calcular cuánto oxígeno transporta la hemoglobina del paciente.", "esfigmomanómetro|tensiómetro|baumanómetro": "Instrumento utilizado para medir de forma indirecta la presión arterial. Consiste en un brazalete inflable y un manómetro que permite registrar la presión sistólica y diastólica.", "monitor de signos vitales|monitor multiparámetro": "Equipo clínico que mide y muestra en pantalla varios parámetros fisiológicos de forma simultánea. Alerta al personal médico si el paciente presenta alteraciones críticas.", "miocardio|músculo cardíaco": "Tejido muscular del corazón responsable de bombear la sangre. Su actividad eléctrica es la que capta el electrocardiógrafo en la superficie del cuerpo.", "electrodo|parche ecg|sensor ecg|electrodos": "Pieza conductora que se adhiere a la piel para captar los impulsos eléctricos del corazón. Se requiere una colocación exacta para evitar errores de lectura.", "derivación|canal ecg": "Punto de vista eléctrico desde el cual se observa el corazón, logrado al combinar dos o más electrodos. Un estudio estándar consta de doce vistas diferentes.", "nodo sinusal|nódulo sa|marcapasos natural": "Grupo de células especializadas en la aurícula derecha que inician el impulso eléctrico normal del corazón. Actúa como el controlador principal del ritmo cardíaco.", "despolarización|activación eléctrica": "Proceso mediante el cual las células cardíacas cambian su carga eléctrica para iniciar la contracción muscular. Es el evento eléctrico que precede al latido físico.", "repolarización|recuperación eléctrica": "Fase en la que las células del corazón recuperan su carga eléctrica de reposo después de haberse contraído. Prepara al músculo para el siguiente ciclo cardíaco.", "línea isoeléctrica|línea base": "Línea horizontal en el trazado que representa la ausencia de actividad eléctrica cardíaca. Sirve como referencia base para medir la amplitud de las demás ondas.", "intervalo pr|espacio pr": "Medida de tiempo desde el inicio de la onda p hasta el inicio del complejo qrs. Representa el retraso fisiológico del impulso eléctrico antes de llegar a los ventrículos.", "segmento st|espacio st": "Línea recta que conecta el final del complejo qrs con el inicio de la onda t. Su elevación o descenso es clave para diagnosticar problemas de flujo sanguíneo al corazón.", "intervalo qt|tiempo qt": "Medida que abarca desde el inicio del qrs hasta el final de la onda t, reflejando toda la actividad eléctrica ventricular. Si es muy prolongado, aumenta el riesgo de arritmias peligrosas.", "onda u|deflexión u": "Pequeña onda inconstante que a veces aparece después de la onda t. Su origen exacto se debate, pero suele asociarse a la repolarización de ciertas fibras musculares específicas.", "frecuencia cardíaca|fc|ritmo cardíaco": "Número de veces que el corazón se contrae en un minuto. Un registro continuo de {bpm} latidos por minuto ayuda a determinar si el corazón va muy rápido o muy lento.", "bradicardia|ritmo lento": "Frecuencia cardíaca anormalmente baja, generalmente por debajo del rango de latidos esperado en reposo. Puede causar mareos si el cerebro no recibe suficiente irrigación sanguínea.", "taquicardia|ritmo rápido": "Aceleración del ritmo cardíaco por encima de los valores normales en reposo. Puede ser una respuesta natural al ejercicio o el síntoma de una alteración eléctrica grave.", "ritmo sinusal|ritmo normal": "Secuencia de latidos saludables y regulares originados correctamente en el nodo sinusal. Se identifica porque cada onda p va seguida de un complejo qrs a intervalos constantes.", "arritmia|disritmia": "Cualquier alteración en la regularidad, frecuencia o punto de origen del latido cardíaco. Puede requerir tratamiento urgente dependiendo del tipo específico que arroje el estudio.", "fibrilación auricular|fa|fia": "Arritmia común donde las aurículas laten de forma caótica y rápida, perdiendo su capacidad de bombeo eficaz. En el trazado, desaparecen las ondas p y el ritmo se vuelve irregular.", "fibrilación ventricular|fv": "Arritmia letal en la que los ventrículos tiemblan en lugar de contraerse, deteniendo el flujo de sangre. Requiere el uso inmediato de un desfibrilador para evitar la muerte.", "extrasístole|latido prematuro": "Latido anticipado que interrumpe el ritmo normal del corazón, seguido a menudo de una pausa compensatoria. Puede originarse en las aurículas o ventrículos y sentirse como un vuelco en el pecho.", "bloqueo auriculoventricular|bloqueo av": "Interrupción o retraso anormal en la conducción del impulso eléctrico entre las aurículas y los ventrículos. Se clasifica en diferentes grados según su gravedad vista en el electrocardiograma.", "isquemia miocárdica|isquemia": "Reducción del flujo de sangre y oxígeno hacia el músculo cardíaco, a menudo visible como la inversión de la onda t. Es una señal de advertencia antes de un posible daño celular permanente.", "infarto agudo de miocardio|iam|ataque al corazón": "Muerte de tejido cardíaco debido a la obstrucción prolongada de una arteria coronaria. Se suele identificar por una elevación característica del segmento st en derivaciones específicas.", "holter|monitor holter|ecg 24 horas": "Grabadora portátil que registra continuamente el electrocardiograma durante uno o más días. Es útil para el paciente que requiere evaluación ambulatoria sin afectar su rutina.", "prueba de esfuerzo|ergometría": "Examen que registra el electrocardiograma mientras el paciente camina en una cinta o pedalea en bicicleta. Ayuda a descubrir problemas cardíacos que solo aparecen cuando el corazón requiere más energía.", "eje eléctrico|vector cardíaco": "Dirección principal en la que viaja el impulso eléctrico a través de los ventrículos durante la despolarización. Su cálculo analítico permite detectar agrandamientos del corazón o bloqueos de rama.", "mantenimiento preventivo|mp|rutina de mantenimiento": "Revisión periódica y sistemática de un equipo médico para evitar fallos futuros y prolongar su vida útil. Permite garantizar que el dispositivo sea seguro tanto para el operador como para el paciente.", "inspección visual|revisión física": "Primer paso del mantenimiento que busca daños externos como grietas, desgaste o piezas faltantes en la carcasa. Es fundamental para detectar problemas evidentes antes de encender la unidad.", "limpieza externa|desinfección de chasis": "Proceso de remoción de polvo, fluidos y suciedad del cuerpo del equipo usando paños ligeramente húmedos con soluciones aprobadas. Previene la contaminación cruzada y evita daños en los botones de control.", "electrocardiógrafo|equipo ecg|máquina de electrocardiograma": "Dispositivo médico que captura, amplifica y registra la actividad eléctrica del corazón. Su correcto funcionamiento técnico es vital para que el médico emita un diagnóstico cardiológico preciso.", "cable de paciente|latiguillos|cables ecg": "Conjunto de conductores flexibles que conectan los electrodos del cuerpo hacia el equipo principal. Son propensos a cortes y tirones, por lo que requieren revisión física frecuente.", "integridad del cable|revisión de continuidad": "Prueba eléctrica para confirmar que el alambre interno de los cables no está roto. Se realiza doblando suavemente el cable mientras se verifica con un multímetro que la señal no se interrumpa.", "electrodos de extremidades|pinzas ecg|caimanes": "Conectores metálicos en forma de pinza que se sujetan a los brazos y piernas del paciente. Durante el mantenimiento se debe limpiar el gel acumulado en sus placas para evitar la oxidación e impedancia alta.", "electrodos precordiales|chupones|perillas de succión": "Copas de goma con un bulbo metálico que se adhieren al pecho mediante vacío. Su mantenimiento exige verificar que la goma no esté agrietada para asegurar una buena succión mecánica.", "papel termosensible|papel milimetrado|papel ecg": "Consumible especial que reacciona al calor para imprimir el trazado sin necesidad de tinta. Se debe verificar que el compartimiento esté libre de polvo y residuos para evitar atascos.", "rodillo de impresión|rodillo de tracción": "Cilindro de goma que jala el papel a una velocidad constante bajo la impresora del equipo. Si está sucio o desgastado, el trazado saldrá ondulado o con medidas incorrectas.", "cabezal térmico|impresora térmica": "Componente electrónico que calienta puntos minúsculos para quemar el papel y formar las ondas. Se limpia delicadamente con alcohol isopropílico y un hisopo para asegurar trazos nítidos.", "batería de respaldo|batería interna|acumulador": "Fuente de energía recargable que permite usar el equipo durante traslados o cortes eléctricos. Su mantenimiento implica verificar que retenga la carga adecuada y no presente hinchazón física.", "prueba de encendido|autotest|post": "Rutina automática de diagnóstico que ejecuta el equipo al presionar el botón de inicio. Un pitido o mensaje en pantalla confirma que las placas base y la memoria funcionan correctamente.", "simulador de ecg|simulador de paciente|generador de señales": "Aparato electrónico que genera ondas cardíacas artificiales perfectas para probar el electrocardiógrafo. Se usa para verificar que el equipo lea correctamente, por ejemplo, unos {bpm} latidos por minuto simulados.", "amplitud de calibración|pulso de 1mv": "Señal estándar de un milivoltio que el equipo imprime como un rectángulo de altura específica. Permite al técnico comprobar que la ganancia de los amplificadores no está alterada.", "velocidad de barrido|velocidad de papel": "Ajuste que determina qué tan rápido avanza el papel durante un registro impreso, típicamente medido en milímetros por segundo. El técnico debe medir con regla que el avance real coincida con la configuración.", "resistencia de tierra|continuidad de tierra|conductor de proteccion": "Medición que comprueba si el chasis metálico del equipo tiene una conexión ininterrumpida hacia la clavija redonda de la toma de corriente. Un valor bajo garantiza que un cortocircuito se desvíe al suelo.", "corriente de fuga al chasis|fuga de carcasa": "Pequeña cantidad de energía eléctrica que escapa hacia el exterior del equipo desde la fuente de alimentación. El mantenimiento verifica que este valor se mantenga por debajo de los límites seguros.", "corriente de fuga al paciente|fuga de derivaciones": "Electricidad indeseada que fluye directamente desde el equipo hacia los electrodos conectados al cuerpo humano. Es el parámetro de seguridad más crítico a evaluar en los dispositivos cardiológicos.", "aislamiento de paciente|barrera dieléctrica": "Sistema de protección interno que separa eléctricamente los conectores frontales de la red de corriente alterna. El técnico verifica que esta barrera soporte alteraciones eléctricas externas sin fallar.", "norma iec 62353|estándar de seguridad|norma iec": "Reglamento internacional que define los métodos de prueba de seguridad eléctrica para equipos médicos en servicio. Guía al personal técnico sobre las tolerancias de corrientes de fuga aceptables.", "filtro de ruido|filtro de línea|filtro muscular": "Funciones de procesamiento que limpian interferencias eléctricas en la señal del corazón. El mantenimiento comprueba que al activarlos, el equipo atenúe el ruido ambiental sin distorsionar la onda original.", "bornera equipotencial|terminal de tierra|nodo equipotencial": "Conector metálico en la parte trasera del monitor diseñado para anclar un cable de tierra adicional. Se inspecciona visualmente para asegurar que no tenga óxido y ofrezca un contacto eléctrico perfecto.", "conector tipo d|puerto de cables|conector principal": "Interfaz de múltiples pines donde se enchufa el latiguillo del paciente al chasis del equipo. El técnico debe limpiarlo con aire comprimido y revisar que ningún pin esté doblado o hundido.", "revisión de alarmas|prueba de sonido": "Procedimiento para asegurar que los indicadores visuales y parlantes funcionen correctamente. Consiste en simular una emergencia de ritmo cardíaco para confirmar que la alerta sonora se active a un volumen audible.", "actualización de firmware|parche de software": "Proceso de instalación de la versión más reciente del sistema operativo interno proporcionado por el fabricante. Corrige errores de programación y mejora la precisión en la interpretación de los trazados.", "calibración metrológica|ajuste de medición": "Comparación formal de los valores que mide el equipo contra los valores exactos de un patrón certificado. Si las lecturas difieren, se realizan ajustes internos de hardware o software para corregir la desviación.", "hoja de vida del equipo|bitácora de mantenimiento|registro técnico": "Documento donde se anotan ordenadamente todas las fallas, repuestos instalados y mantenimientos realizados históricamente. Mantenerla actualizada ayuda a predecir futuros desgastes del dispositivo médico.", "reporte de servicio|informe técnico|certificado de mantenimiento": "Documento formal final que el técnico entrega al centro de salud detallando las pruebas pasadas y los parámetros medidos. Sirve como aval legal e institucional de que el dispositivo es seguro para su uso.", "mantenimiento|que es el mantenimiento|mantenimiento de equipos|mantenimiento biomedico": "Conjunto de acciones para que un equipo biomédico funcione de forma segura y confiable durante toda su vida útil. Puede ser preventivo (programado antes de que falle), correctivo (después de la falla) o predictivo (según el estado del equipo). Pregúntame por los pasos del mantenimiento del ECG.", "pasos del mantenimiento del ecg|pasos del mantenimiento|como se hace el mantenimiento|mantenimiento del ecg|mantenimiento del electrocardiografo|procedimiento de mantenimiento": "Pasos generales del mantenimiento preventivo de un electrocardiógrafo:\n1. Inspección visual de carcasa, cables y conectores.\n2. Limpieza externa del equipo y de los electrodos.\n3. Revisión de la integridad del cable de paciente.\n4. Revisión del papel, el rodillo y el cabezal térmico.\n5. Revisión de la batería de respaldo.\n6. Prueba de encendido (autotest).\n7. Verificación de calibración (pulso de 1 mV) y velocidad de papel.\n8. Pruebas de seguridad eléctrica: resistencia de tierra y corrientes de fuga.\n9. Revisión de alarmas y filtros.\n10. Registro en la hoja de vida y reporte de servicio.\nSigue siempre el manual del fabricante."};
+const KBVER='4';let DEL=[];
+try{const same=localStorage.getItem('ecgKBver')===KBVER;DEL=same?JSON.parse(localStorage.getItem('ecgDEL')||'[]'):[];const sv=JSON.parse(localStorage.getItem('ecgKB')||'null');
+ if(sv){const nz=t=>t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(),als=k=>k.split('|').map(nz).filter(Boolean),own=new Set(Object.keys(baseConocimiento).flatMap(als));
+  for(const k in sv)if(same||!als(k).some(x=>own.has(x)))baseConocimiento[k]=sv[k];
+  DEL.forEach(k=>delete baseConocimiento[k]);localStorage.setItem('ecgKB',JSON.stringify(baseConocimiento));localStorage.setItem('ecgDEL',JSON.stringify(DEL))}
+ localStorage.setItem('ecgKBver',KBVER)}catch(e){}
+if(/sin conexi[oó]n/i.test(baseConocimiento['hola']||'')){baseConocimiento['hola']='¡Hola! Soy tu tutor de ECG. Selecciona cualquier recuadro y te propondré preguntas.';try{localStorage.setItem('ecgKB',JSON.stringify(baseConocimiento))}catch(e){}}
+let IDX=null;
+const saveKB=()=>{IDX=null;DEL=DEL.filter(k=>!(k in baseConocimiento));try{localStorage.setItem('ecgKB',JSON.stringify(baseConocimiento));localStorage.setItem('ecgDEL',JSON.stringify(DEL))}catch(e){}trainTutorSoon()};
+const pkey=k=>k.split('|')[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+const putKB=(k,v)=>{const f=pkey(k),old=Object.keys(baseConocimiento).find(x=>x!==k&&pkey(x)===f);if(old){delete baseConocimiento[old];if(!DEL.includes(old))DEL.push(old)}baseConocimiento[k]=v;saveKB()};
+const delKB=k=>{delete baseConocimiento[k];if(!DEL.includes(k))DEL.push(k);saveKB()};
+
+/* ---------- Estado ---------- */
+let SES=null;
+const S={bpm:75,amp:1,aP:1,aQ:1,wQ:1,aT:1,posT:0,spd:25,off:0};
+const D={...S};
+const f1=v=>v.toFixed(1),f2=v=>v.toFixed(2),sg=(v,t)=>(v>0?'+':'')+t;
+const SL=[['bpm','Frecuencia cardíaca',30,200,1,v=>v+' lpm',[60,100],'¿Cuántos latidos por minuto?','❤️ Ritmo'],
+['aP','Onda P',0,3,.1,v=>'×'+f1(v),[.6,1.5],'Las aurículas se activan (antes del QRS)','〰️ Forma de las ondas'],
+['aQ','QRS · altura',0,2.5,.1,v=>'×'+f1(v),[.6,1.5],'Voltaje con que se activan los ventrículos'],
+['wQ','QRS · ancho',.6,2,.05,v=>'×'+f2(v),[.6,1.1],'Qué tan rápido se activan los ventrículos'],
+['aT','Onda T',-1.5,3,.1,v=>'×'+f1(v),[.4,1.8],'Los ventrículos se recuperan (repolarización)'],
+['posT','Posición de la T',-.1,.1,.01,v=>sg(v,Math.round(v*1000)+' ms'),[-.03,.03],'Cuándo se recuperan: alarga o acorta el QT'],
+['amp','Ganancia (tamaño)',.4,2,.05,v=>'×'+f2(v),[.95,1.05],'Agranda o encoge toda la señal, como el equipo real','📄 Papel y equipo'],
+['spd','Velocidad del papel',10,50,2.5,v=>v+' mm/s',[24,26],'25 mm/s es el estándar clínico'],
+['off','Línea base',-.5,.5,.05,v=>sg(v,f2(v)),[-.1,.1],'Sube o baja toda la señal (deriva)']];
+const LEADS={I:['Lateral alta',[.12,.08,.8,.12,.3]],II:['Inferior',[.15,.08,1.1,.12,.35]],III:['Inferior',[.08,.05,.5,.15,.2]],
+aVR:['Cavidad derecha',[-.12,0,-.8,0,-.3]],aVL:['Lateral alta',[.05,.05,.4,.1,.1]],aVF:['Inferior',[.12,.06,.8,.12,.28]],
+V1:['Septal Der.',[.05,0,.25,1,-.1]],V2:['Septal Izq.',[.06,0,.5,1.1,.35]],V3:['Anterior',[.08,0,.8,.7,.4]],
+V4:['Anterior apical',[.1,.05,1.2,.4,.45]],V5:['Lateral',[.1,.1,1.1,.2,.4]],V6:['Lateral baja',[.1,.1,.9,.1,.3]]};
+const ORDER=[['I','aVR','V1','V4'],['II','aVL','V2','V5'],['III','aVF','V3','V6']].flat();
+let P={};try{P=JSON.parse(localStorage.getItem('ecgPac')||'{}')}catch(e){}
+const ctx={type:'default',lead:'II'};
+
+/* ---------- Matemática del ECG ---------- */
+function bump(x,c,w){const d=x-(c-w/2);return d>0&&d<w?Math.pow(Math.sin(Math.PI*d/w),2):0}
+function ecgP(S,t,m,A){
+ const rr=60/S.bpm,k=Math.min(1,Math.pow(rr/.8,.75)),tb=t%rr,w=.09*S.wQ*k,c=.30*k;
+ const [p,q,r,s,tt]=m;
+ const v=S.aP*p*bump(tb,.14*k,.11*k)
+  -S.aQ*q*bump(tb,c-.45*w,.3*w)
+  +S.aQ*r*bump(tb,c,.55*w)
+  -S.aQ*s*bump(tb,c+.5*w,.45*w)
+  +S.aT*tt*bump(tb,c+.22*k+S.posT,.2*k);
+ return A*v+S.off;
+}
+const getECGValue=(t,m,A)=>ecgP(S,t,m,A);
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+const center=$('center'),canv=[];
+function mkCanvas(cv,lead,zoom,color){const o={cv,ctx:cv.getContext('2d'),lead,z:zoom?1.8:1,zoom,color,x:0,y:0,t:0,w:0,h:0};canv.push(o);return o}
+ORDER.forEach(id=>{const d=document.createElement('div');d.className='box lead';d.dataset.ctx='lead';d.dataset.id=id;
+ d.title='Toca para ampliar y preguntar al tutor sobre '+id;d.innerHTML=`<header><b>${id}</b><i>${LEADS[id][0]}</i></header><div class="paper"><canvas></canvas><span class="cal"></span></div>`;center.appendChild(d);
+ mkCanvas(d.querySelector('canvas'),id,false,/^V/.test(id)?'#8a2a5b':'#0f5f8a')});
+const zoomO=mkCanvas($('zoomC'),'II',true,'#0b3d5c');
+function resize(){canv.forEach(o=>{o.w=o.cv.width=o.cv.clientWidth;o.h=o.cv.height=o.cv.clientHeight;o.x=0;o.y=o.h*(o.zoom?.65:.55)})}
+addEventListener('resize',resize);
+const SLI={},SLR={},sl=$('sl');
+SL.forEach(([k,l,mn,mx,st,fmt,nz,desc,g])=>{
+ if(g){const h=document.createElement('div');h.className='gh';h.textContent=g;sl.appendChild(h)}
+ const d=document.createElement('div');d.className='sr';
+ d.innerHTML=`<div class="sh"><span class="sn">${l}</span><span class="sv"><b id="v_${k}"></b><button class="rs" title="Volver al valor normal">↺</button></span></div><input type="range" min="${mn}" max="${mx}" step="${st}"><div class="sd">${desc}</div>`;
+ const inp=d.querySelector('input');inp.value=S[k];SLI[k]=inp;SLR[k]=d;
+ const a=(nz[0]-mn)/(mx-mn)*100,b=(nz[1]-mn)/(mx-mn)*100,c1=k==='bpm'?'#bcd7ee':'#dbe4eb',c3=k==='bpm'?'#f3c9bd':'#dbe4eb';
+ inp.style.setProperty('--trk',`linear-gradient(90deg,${c1} 0 ${a}%,#9fd8b0 ${a}% ${b}%,${c3} ${b}% 100%)`);
+ inp.oninput=e=>{S[k]=+e.target.value;onChange(k)};
+ d.querySelector('.rs').onclick=()=>{S[k]=D[k];onChange(k)};
+ sl.appendChild(d)});
+function syncSliders(){SL.forEach(([k,,,,,fmt,nz])=>{SLI[k].value=S[k];$('v_'+k).textContent=fmt(S[k]);
+ SLR[k].classList.toggle('chg',Math.abs(S[k]-D[k])>1e-9);SLR[k].dataset.z=(S[k]>=nz[0]-1e-9&&S[k]<=nz[1]+1e-9)?'ok':'out'})}
+function dx(){return S.bpm<60?'Bradicardia Sinusal':S.bpm<=100?'Ritmo Sinusal Normal':'Taquicardia Sinusal'}
+function refresh(){$('bpmV').textContent=Math.round(S.bpm);$('dxV').textContent=dx();
+ document.querySelectorAll('.cal').forEach(e=>e.textContent=S.spd+' mm/s · '+Math.round(10*S.amp)+' mm/mV');renderMeas();
+ renderPat()}
+
+/* ---------- Barrido ---------- */
+let last=performance.now(),paused=false;
+function frame(now){
+ const dt=Math.min(.05,(now-last)/1000);last=now;
+ drawBeat(now);
+ for(const o of canv){if(paused||!o.w)continue;
+  const {ctx:g,w,h}=o,pps=S.spd*5*o.z,dxp=pps*dt,n=Math.max(1,Math.ceil(dxp)),st=dxp/n,ppmv=h*(o.zoom?.3:.33),cy=h*(o.zoom?.65:.55);
+  const m=LEADS[o.zoom?ctx.lead:o.lead][1];
+  g.clearRect(o.x,0,dxp+16,h);if(o.x+dxp+16>w)g.clearRect(0,0,o.x+dxp+16-w,h);
+  g.strokeStyle=o.color;g.lineWidth=1.6;g.lineJoin='round';g.beginPath();g.moveTo(o.x,o.y);
+  for(let i=0;i<n;i++){o.x+=st;o.t+=st/pps;
+   if(o.x>=w){g.stroke();o.x=0;g.beginPath();g.moveTo(0,o.y)}
+   o.y=cy-getECGValue(o.t,m,S.amp)*ppmv;g.lineTo(o.x,o.y)}
+  g.stroke()}
+ requestAnimationFrame(frame)}
+
+/* ---------- Tutor ---------- */
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function vars(t){const h=(+P.altura||0)/100,imc=(P.peso&&h)?(P.peso/(h*h)).toFixed(1):'—';
+ const M={nombre:P.nombre||'el paciente',bpm:Math.round(S.bpm),peso:P.peso||'—',diag:dx(),edad:P.edad||'—',sexo:P.sexo||'—',altura:P.altura||'—',pa:P.pa||'—',imc,lead:ctx.lead,region:LEADS[ctx.lead][0],ant:P.ant||'sin datos'};
+ return t.replace(/\{(\w+)\}/g,(m,k,o,str)=>{if(!(k in M))return m;let v=String(M[k]);if(k==='nombre'&&(o===0||/[.!?]\s$/.test(str.slice(0,o))))v=v.charAt(0).toUpperCase()+v.slice(1);return v})}
+const STOP=new Set('que es el la los las un una de del en y o a al por para con como cual cuales significa significado quiero saber dime explica explicame sobre me mi se lo su sus son hay'.split(' '));
+const clean=s=>norm(s).replace(/[^a-z0-9\s]/g,' ');
+const tok=s=>clean(s).split(/\s+/).filter(w=>w&&!STOP.has(w));
+function lev(a,b){if(Math.abs(a.length-b.length)>2)return 9;const d=[];for(let i=0;i<=a.length;i++)d[i]=[i];for(let j=1;j<=b.length;j++)d[0][j]=j;
+ for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[a.length][b.length]}
+function wsim(a,b){if(a===b)return 1;if(a.length>=4&&b.length>=4&&(a.startsWith(b)||b.startsWith(a)))return .85;
+ let i=0;const mn=Math.min(a.length,b.length),m=Math.max(a.length,b.length);while(i<mn&&a[i]===b[i])i++;
+ if(i>=5&&mn-i<=2&&m-i<=5)return .8;
+ return m>=5&&lev(a,b)<=(m>=8?2:1)?.75:0}
+const GEN=new Set('funciona funcionan sirve sirven pasos diferencia diferencias tipos significa definicion concepto ejemplo ejemplos importancia usa usan usar hace hacen hacer realiza realizar mide medir'.split(' '));
+function buildIdx(){const keys=Object.keys(baseConocimiento),al=keys.map(k=>k.split('|').map(a=>({t:tok(a),c:' '+clean(a).replace(/\s+/g,' ').trim()+' '})).filter(a=>a.t.length)),df={};
+ al.forEach(L=>{const st=new Set();L.forEach(a=>a.t.forEach(w=>st.add(w)));st.forEach(w=>df[w]=(df[w]||0)+1)});
+ return{keys,al,df,N:keys.length,vocab:Object.keys(df)}}
+function rank(q){const qt=[...new Set(tok(q))];if(!qt.length)return[];
+ IDX=IDX||buildIdx();const{keys,al,df,N,vocab}=IDX,qc=' '+clean(q).replace(/\s+/g,' ').trim()+' ',cw={};
+ for(const w of qt){let b=null,bs=0;for(const v of vocab){const x=wsim(w,v);if(x>bs){bs=x;b=v;if(x===1)break}}
+  if(bs>=.75)cw[w]=Math.log(1+N/df[b])*(GEN.has(b)?.25:1)}
+ const kn=Object.keys(cw);if(!kn.length)return[];const Wq=kn.reduce((a,w)=>a+cw[w],0)||1,out=[];
+ keys.forEach((k,i)=>{let best=0,bq=0;
+  for(const a of al[i]){let ac=0,qv=0;
+   const cv=x=>x===1?1:x>=.75?.97:0;
+   for(const t of a.t){let m=0;for(const w of kn){const x=cv(wsim(t,w));if(x>m)m=x}ac+=m}ac/=a.t.length;
+   for(const w of kn){let m=0;for(const t of a.t){const x=cv(wsim(t,w));if(x>m)m=x}qv+=m*cw[w]}qv/=Wq;
+   let sc=ac*(.4+.6*qv)+(qc.includes(a.c)?.1*qv:0)+Math.min(a.t.length,3)*.01;
+   if(sc>best){best=sc;bq=qv}}
+  if(best>=.15)out.push([k,best,bq])});
+ return out.sort((x,y)=>y[1]-x[1])}
+function searchText(q){const qt=[...new Set(tok(q))];if(!qt.length)return null;const keys=Object.keys(baseConocimiento),
+ docs=keys.map(k=>new Set(tok(k.replace(/\|/g,' ')+' '+baseConocimiento[k].replace(/\{\w+\}/g,'')))),df={};
+ docs.forEach(d=>d.forEach(w=>df[w]=(df[w]||0)+1));if(!qt.some(w=>(df[w]||0)<=8))return null;let best=null,bs=0;
+ docs.forEach((d,i)=>{let sc=0,hit=0;for(const w of qt){let m=0;for(const x of d){m=Math.max(m,wsim(w,x));if(m===1)break}
+  if(m>=.75){hit++;sc+=m*Math.log(1+docs.length/(df[w]||1))}}if(hit===qt.length&&sc>bs){bs=sc;best=keys[i]}});return best}
+let SUG=[];
+function answer(q){SUG=[];const r=rank(q),top=r[0];
+ if(top&&top[1]>=.7&&top[2]>=.55){SUG=r.slice(1,4).filter(x=>x[1]>=top[1]-.1&&x[1]>=.6).map(x=>x[0]);return vars(baseConocimiento[top[0]])}
+ const nn=tutorPredict(q);
+ if(nn.length&&nn[0][1]>=.5&&(!r.length||nn[0][1]>=.8||r.some(x=>x[0]===nn[0][0])))return vars(baseConocimiento[nn[0][0]]);
+ const mt=searchText(q);if(mt)return 'No tengo una definición exacta de eso, pero aparece mencionado en «'+mt.split('|')[0]+'»:\n'+vars(baseConocimiento[mt]);
+ SUG=r.filter(x=>x[1]>=.2).slice(0,3).map(x=>x[0]);
+ return (SUG.length?'No tengo una respuesta exacta a esa pregunta. Toca uno de los temas relacionados si te sirve.\n':'')+'Todavía no tengo información confiable sobre ese tema. Te recomiendo confirmarlo con el creador de la aplicación o consultarlo con tu profesor.'}
+function showSug(){const q=$('quick');q.innerHTML='';$('ctxChip').textContent='Temas relacionados';
+ SUG.forEach(k=>{const b=document.createElement('button'),t=k.split('|')[0];b.textContent=t.charAt(0).toUpperCase()+t.slice(1);b.onclick=()=>send(b.textContent,k);q.appendChild(b)});
+ const h=document.createElement('button');h.textContent='⌂ Menú de temas';h.onclick=()=>showMenu('inicio');q.appendChild(h)}
+function clashes(k){const mine=k.split('|').map(a=>norm(a).trim()).filter(Boolean),o2=[];
+ for(const o in baseConocimiento){if(o===k)continue;const oa=o.split('|').map(a=>norm(a).trim());const sh=mine.filter(a=>oa.includes(a));if(sh.length)o2.push('«'+sh[0]+'» ya la usa «'+o.split('|')[0]+'»')}return o2}
+function addMsg(c,t,nolog){const d=document.createElement('div');d.className='m '+c;d.textContent=(c==='u'&&tgReply?'📱 ':'')+t;$('log').appendChild(d);$('log').scrollTop=1e9;if(SES&&!nolog){SES.chat.push({t:Date.now(),r:c,x:t});saveSes()}tgMirror(c,t,nolog)}
+function kbGet(n){const q=norm(n),k=Object.keys(baseConocimiento).find(x=>x===n||norm(x.split('|')[0])===q);return k?baseConocimiento[k]:null}
+function send(text,key,next){text=text.trim();if(!text)return;if(/^\/?admin$/i.test(text)){openAdm();return}addMsg('u',text);
+ if(text==='/admin'){openAdm();return}
+ let m;
+ if(m=text.match(/^aprende\s*:\s*([^=]+?)\s*=\s*([\s\S]+)$/i)){putKB(m[1].trim().toLowerCase(),m[2].trim());const kk=m[1].trim().toLowerCase(),cl=clashes(kk);addMsg('ai','Aprendido: "'+m[1].trim()+'". Ya puedes preguntarme por ese término.'+(cl.length?'\nAviso: '+cl.slice(0,3).join('; ')+'. Usa sinónimos distintos para evitar confusiones.':''));return}
+ if(m=text.match(/^olvida\s*:\s*(.+)$/i)){const k=Object.keys(baseConocimiento).find(x=>norm(x)===norm(m[1].trim()));if(k){delKB(k);addMsg('ai','Olvidé "'+k+'".')}else addMsg('ai','No encontré ese término.');return}
+ if(text==='/glosario'){addMsg('ai',Object.keys(baseConocimiento).map(k=>k.split('|')[0]).sort().join(', '));return}
+ setTimeout(()=>{addMsg('ai',key&&kbGet(key)?vars(kbGet(key)):answer(text));if(next)setTimeout(()=>showMenu(next),350);else if(!key&&SUG.length)showSug()},200)}
+const QB={
+ lead:[['¿Qué región explora?','region derivacion'],['¿Cómo se ve normal aquí?','morfologia derivacion'],['Onda T','onda t']],
+ bpm:[['¿Qué es la FC?','frecuencia cardiaca'],['Rangos normales','rangos fc'],['¿Cómo se calcula?','calculo fc']],
+ dx:[['¿Cómo se clasifica?','clasificacion automatica'],['Mi diagnóstico actual','diag actual'],['Limitaciones','limitaciones']],
+ zoom:[['¿Qué es el zoom?','zoom'],['Intervalo PR','intervalo pr'],['Segmento ST','segmento st']],
+ sliders:[['¿Qué hace cada control?','controles'],['Calibración','calibracion'],['Velocidad del papel','velocidad papel']],
+ paciente:[['Resumen del paciente','resumen paciente'],['Peso e IMC','imc'],['Presión arterial','presion arterial']],
+ default:[['¿Qué es un ECG?','ecg'],['Derivaciones','derivaciones'],['Onda P','onda p']]};
+const MENUS={
+inicio:{q:'¿Qué quieres aprender hoy? Elige un tema o escríbeme tu pregunta.',b:[['¿Para qué sirve el equipo?','para que sirve el electrocardiografo','equipo'],['¿Cómo funciona?','como funciona el electrocardiografo','equipo'],['Tipos de paciente según la lectura',null,'tipos'],['Síntomas y relación con el ECG',null,'sintomas'],['Cómo leer un ECG',null,'leer']]},
+equipo:{q:'Sigamos con el equipo. ¿Qué quieres ver ahora?',b:[['Para qué sirve','para que sirve el electrocardiografo'],['Partes del equipo','partes del equipo'],['Cómo capta la señal','como funciona el electrocardiografo'],['Colocación de electrodos','colocacion de electrodos'],['Filtros y ruido','filtro'],['Seguridad y mantenimiento','seguridad electrica']]},
+tipos:{q:'¿Qué tipo de paciente o lectura quieres revisar? Mueve el slider de frecuencia para verlo en vivo.',b:[['Bradicardia','paciente bradicardia'],['Ritmo normal','paciente ritmo sinusal normal'],['Taquicardia','paciente taquicardia'],['Según la edad','pacientes por edad'],['Pacientes de riesgo','pacientes de riesgo']]},
+sintomas:{q:'¿Qué síntoma quieres relacionar con el ECG?',b:[['Mareo y síncope','sintoma sincope'],['Palpitaciones','sintoma palpitaciones'],['Dolor torácico','sintoma dolor toracico'],['Falta de aire','sintoma disnea'],['Fatiga y debilidad','sintoma fatiga'],['Cuándo es urgente','signos de alarma']]},
+leer:{q:'¿Por dónde empezamos con la lectura?',b:[['Método paso a paso','metodo lectura ecg'],['Papel y calibración','calibracion'],['Frecuencia','calculo fc'],['Onda P y PR','intervalo pr'],['QRS','qrs'],['ST y T','segmento st']]}};
+function showMenu(n){const m=MENUS[n];addMsg('ai',m.q);const q=$('quick');q.innerHTML='';$('ctxChip').textContent='Tema: '+n;
+ m.b.concat(n==='inicio'?[]:[['⌂ Inicio',null,'inicio']]).forEach(([t,k,nx])=>{const b=document.createElement('button');b.textContent=t;
+  b.onclick=()=>k?send(t,k,nx||n):(addMsg('u',t),showMenu(nx));q.appendChild(b)})}
+function setCtx(type,label){ctx.type=type;$('ctxChip').textContent='Contexto: '+label;const q=$('quick');q.innerHTML='';
+ QB[type].forEach(([t,k])=>{const b=document.createElement('button');b.textContent=t;b.onclick=()=>send(t,k);q.appendChild(b)});
+ const h=document.createElement('button');h.textContent='⌂ Menú de temas';h.onclick=()=>showMenu('inicio');q.appendChild(h)}
+document.addEventListener('click',e=>{const bx=e.target.closest('.box[data-ctx]');if(!bx)return;
+ document.querySelectorAll('.box.sel').forEach(x=>x.classList.remove('sel'));bx.classList.add('sel');
+ const t=bx.dataset.ctx;
+ if(t==='lead'){ctx.lead=bx.dataset.id;trackLead(ctx.lead);$('zoomLbl').textContent=ctx.lead;zoomO.t=0;setCtx('lead','derivación '+ctx.lead+' ('+LEADS[ctx.lead][0]+')')}
+ else setCtx(t,{bpm:'frecuencia cardíaca',dx:'diagnóstico automático',zoom:'zoom de '+ctx.lead,sliders:'controles de onda',paciente:'ficha del paciente'}[t])});
+$('sendBtn').onclick=()=>{send($('chatIn').value);$('chatIn').value=''};
+$('chatIn').onkeydown=e=>{if(e.key==='Enter')$('sendBtn').click()};
+
+/* ---------- Modales ---------- */
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.modal').classList.remove('on'));
+
+function openAdm(){$('admModal').classList.add('on');renderAdm();paintTG();netCheck()}
+function renderAdm(){const f=norm($('a_find').value),L=$('a_list');L.innerHTML='';
+ const ks=Object.keys(baseConocimiento).sort().filter(k=>norm(k).includes(f));
+ $('admCount').textContent=ks.length+' de '+Object.keys(baseConocimiento).length+' términos. Toca uno para editarlo.';
+ ks.forEach(k=>{const r=document.createElement('div');r.style.cssText='display:flex;justify-content:space-between;gap:6px;padding:3px 0;border-bottom:1px solid #eef';
+  const s=document.createElement('span');s.textContent=k.split('|')[0];s.style.cursor='pointer';s.onclick=()=>{$('a_key').value=k;$('a_val').value=baseConocimiento[k]};
+  const d=document.createElement('button');d.textContent='Borrar';d.onclick=()=>{delKB(k);renderAdm()};r.append(s,d);L.appendChild(r)})}
+$('a_find').oninput=renderAdm;
+$('a_add').onclick=()=>{const k=$('a_key').value.trim().toLowerCase(),v=$('a_val').value.trim();if(!k||!v)return;
+ putKB(k,v);$('a_key').value=$('a_val').value='';openAdm()};
+$('a_exp').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(baseConocimiento,null,2)],{type:'application/json'}));a.download='baseConocimiento.json';a.click();URL.revokeObjectURL(a.href)};
+$('a_imp').onclick=()=>$('a_file').click();
+$('a_file').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);let n=0;const bad=[],cl=[];for(const k in d){if(typeof d[k]!=='string'||!k.trim()||!d[k].trim()){bad.push(k);continue}const kk=k.trim().toLowerCase();putKB(kk,d[k].trim());n++;clashes(kk).slice(0,2).forEach(c=>cl.push(c))}openAdm();alert(n+' términos cargados.'+(bad.length?'\nOmitidos por formato: '+bad.join(', '):'')+(cl.length?'\n\nAlias repetidos (pueden causar confusión):\n- '+cl.slice(0,8).join('\n- '):''))}catch(x){alert('El archivo no es un JSON válido: '+x.message)}};r.readAsText(f);e.target.value=''};
+
+
+/* ===== Red neuronal (MLP) desde cero ===== */
+function softmax(z){const m=Math.max(...z);let s=0;const e=z.map(v=>{v=Math.exp(v-m);s+=v;return v});return e.map(v=>v/s)}
+class MLP{constructor(i,h,o){this.i=i;this.h=h;this.o=o;const r=(n,s)=>Float32Array.from({length:n},()=>(Math.random()*2-1)*s);
+ this.W1=r(i*h,Math.sqrt(1/i));this.b1=new Float32Array(h);this.W2=r(h*o,Math.sqrt(1/h));this.b2=new Float32Array(o);this.a=new Float32Array(h)}
+ fwd(x){const{i,h,o,W1,W2,b1,b2,a}=this;a.set(b1);for(let k=0;k<i;k++){const xk=x[k];if(xk)for(let j=0;j<h;j++)a[j]+=W1[k*h+j]*xk}
+  for(let j=0;j<h;j++)a[j]=Math.tanh(a[j]);const z=new Array(o);for(let c=0;c<o;c++){let s=b2[c];for(let j=0;j<h;j++)s+=W2[j*o+c]*a[j];z[c]=s}return softmax(z)}
+ step(x,y,lr){const p=this.fwd(x),{i,h,o,W1,W2,b1,b2,a}=this,d1=new Float32Array(h);
+  for(let j=0;j<h;j++){let s=0;for(let c=0;c<o;c++)s+=W2[j*o+c]*(p[c]-(c===y?1:0));d1[j]=s*(1-a[j]*a[j])}
+  for(let j=0;j<h;j++)for(let c=0;c<o;c++)W2[j*o+c]-=lr*(p[c]-(c===y?1:0))*a[j];
+  for(let c=0;c<o;c++)b2[c]-=lr*(p[c]-(c===y?1:0));
+  for(let k=0;k<i;k++){const xk=x[k];if(xk)for(let j=0;j<h;j++)W1[k*h+j]-=lr*d1[j]*xk}
+  for(let j=0;j<h;j++)b1[j]-=lr*d1[j];return -Math.log(p[y]+1e-9)}}
+const argmax=p=>p.indexOf(Math.max(...p));
+const CL=['Ritmo normal','Bradicardia','Taquicardia','QRS ancho','T invertida','Sin onda P'];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function sigFeat(Pm,t0,A){const N=500,dt=.008,y=new Float32Array(N);for(let k=0;k<N;k++)y[k]=ecgP(Pm,t0+k*dt,LEADS.II[1],A);
+ const med=Float32Array.from(y).sort()[N>>1],mx=Math.max(...y),mn=Math.min(...y),thr=mn+.55*(mx-mn),pk=[];
+ for(let i=1;i<N-1;i++)if(y[i]>thr&&y[i]>=y[i-1]&&y[i]>y[i+1]){if(pk.length&&i-pk[pk.length-1]<31){if(y[i]>y[pk[pk.length-1]])pk[pk.length-1]=i}else pk.push(i)}
+ const x=new Float32Array(58),ok=pk.filter(i=>i>=38&&i<N-76),r=ok[0];if(r===undefined)return x;
+ const nx=pk.find(i=>i>r),rr=nx?(nx-r)*dt:(pk.length>1?(r-pk[pk.indexOf(r)-1]||250)*dt:2),sc=(y[r]-med)||1;
+ for(let k=0;k<57;k++)x[k]=(y[r-38+k*2]-med)/sc+(Math.random()-.5)*.03;x[57]=rr/1.5;return x}
+function synth(c){const P={bpm:rnd(60,100),aP:rnd(.7,1.3),aQ:rnd(.8,1.2),wQ:rnd(.75,1.25),aT:rnd(.7,1.3),posT:rnd(-.03,.03),off:rnd(-.15,.15)};
+ if(c==1)P.bpm=rnd(32,58);if(c==2)P.bpm=rnd(105,190);if(c==3)P.wQ=rnd(1.5,2);if(c==4)P.aT=rnd(-1.3,-.4);if(c==5)P.aP=rnd(0,.08);
+ return sigFeat(P,rnd(0,2),rnd(.6,1.6))}
+/* ===== Red del tutor: palabras + trigramas de letras → término ===== */
+const trig=w=>{const s='#'+w+'#',o=[];for(let i=0;i<=s.length-3;i++)o.push(s.slice(i,i+3));return o};
+const feats=t=>{const f=[];for(const w of tok(t)){f.push('w:'+w);if(w.length>=4)f.push(...trig(w))}return f};
+function vec(f,V){const x=new Float32Array(V.size);for(const a of f){const i=V.get(a);if(i!==undefined)x[i]+=1}const n=Math.hypot(...x)||1;return x.map(v=>v/n)}
+const typo=w=>{if(w.length<5)return w;const i=1+Math.floor(Math.random()*(w.length-3));return Math.random()<.5?w.slice(0,i)+w.slice(i+1):w.slice(0,i)+w[i+1]+w[i]+w.slice(i+2)};
+function tutorData(KB){const keys=Object.keys(KB),D=[];
+ keys.forEach((k,y)=>{const add=t=>{const f=feats(t);if(f.length)D.push([f,y])};
+  k.split('|').forEach(a=>{add(a);add(a);add(a.split(' ').map(typo).join(' '));add(a.split(' ').map(typo).join(' '))});
+  KB[k].replace(/\{\w+\}/g,'').split(/[.;:]\s+/).forEach(add)});
+ const V=new Map();D.forEach(([f])=>f.forEach(a=>{if(!V.has(a))V.set(a,V.size)}));
+ return{keys,V,X:D.map(([f,y])=>[vec(f,V),y])}}
+
+/* ===== Laboratorio de IA (interfaz) ===== */
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+let sigNet=null,sigId=0,livex=null,livep=null,tNet=null,tVocab=null,tKeys=[],tId=0,tTimer=null;
+function trainSig(){const id=++sigId,net=new MLP(58,16,6),D=[];for(let n=0;n<1000;n++){const c=n%6;D.push([synth(c),c])}
+ let ep=0;const E=40;sigNet=net;
+ (function loop(){if(id!==sigId)return;let L=0;D.sort(()=>Math.random()-.5);for(const[x,y]of D)L+=net.step(x,y,.05);ep++;
+  $('sigInfo').textContent='Entrenando… época '+ep+'/'+E+' · error '+(L/D.length).toFixed(3);
+  if(ep<E)setTimeout(loop,0);else{let ok=0;for(let n=0;n<300;n++){const c=n%6;if(argmax(net.fwd(synth(c)))===c)ok++}
+   $('sigInfo').textContent='Entrenada con 1000 latidos simulados. Acierto en 300 latidos nuevos: '+Math.round(ok/3)+'%.'}})()}
+function trainTutor(){clearTimeout(tTimer);const id=++tId,d=tutorData(baseConocimiento),net=new MLP(d.V.size,32,d.keys.length);let ep=0;const E=30;
+ (function loop(){if(id!==tId)return;d.X.sort(()=>Math.random()-.5);for(const[x,y]of d.X)net.step(x,y,.2);ep++;
+  $('tInfo').textContent='Entrenando… época '+ep+'/'+E;
+  if(ep<E)setTimeout(loop,0);else{let ok=0,n=0;d.keys.forEach((k,y)=>k.split('|').forEach(a=>{n++;if(argmax(net.fwd(vec(feats(a),d.V)))===y)ok++}));
+   tNet=net;tVocab=d.V;tKeys=d.keys;$('tInfo').textContent=d.keys.length+' términos · '+d.V.size+' rasgos (palabras y trozos de letras) · reconoce '+ok+' de '+n+' nombres.'}})()}
+function trainTutorSoon(){clearTimeout(tTimer);tTimer=setTimeout(trainTutor,700)}
+function tutorPredict(q){if(!tNet)return[];const f=feats(q);if(!f.some(a=>tVocab.has(a)))return[];
+ return tNet.fwd(vec(f,tVocab)).map((p,i)=>[tKeys[i],p]).sort((a,b)=>b[1]-a[1]).slice(0,3)}
+function drawNet(){const c=$('netC'),g=c.getContext('2d'),W=c.width,H=c.height;g.clearRect(0,0,W,H);if(!sigNet||!livex)return;
+ const a=sigNet.a,h=sigNet.h,o=sigNet.o,hx=260,ox=430,hy=j=>14+j*(H-44)/(h-1),oy=k=>24+k*(H-64)/(o-1);
+ g.font='11px sans-serif';g.lineWidth=1;g.strokeStyle='rgba(120,140,160,.18)';
+ for(let j=0;j<h;j++){g.beginPath();g.moveTo(150,H/2-8);g.lineTo(hx,hy(j));g.stroke()}
+ g.strokeStyle='#0f5f8a';g.lineWidth=1.5;g.beginPath();livex.forEach((v,k)=>{if(k>56)return;const x=8+k*2.5,y=H/2-8-v*40;k?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();g.lineWidth=1;
+ for(let j=0;j<h;j++)for(let k=0;k<o;k++){const w=sigNet.W2[j*o+k]*a[j],al=Math.min(.6,Math.abs(w)*.5);g.strokeStyle=w>0?'rgba(224,122,0,'+al+')':'rgba(15,95,138,'+al+')';g.beginPath();g.moveTo(hx,hy(j));g.lineTo(ox,oy(k));g.stroke()}
+ for(let j=0;j<h;j++){const v=Math.min(1,Math.abs(a[j]));g.fillStyle=a[j]>0?'rgba(224,122,0,'+v+')':'rgba(15,95,138,'+v+')';g.beginPath();g.arc(hx,hy(j),6,0,7);g.fill();g.strokeStyle='#9ab';g.stroke()}
+ for(let k=0;k<o;k++){const p=livep[k];g.globalAlpha=.25+.75*p;g.fillStyle='#0f5f8a';g.beginPath();g.arc(ox,oy(k),9,0,7);g.fill();g.globalAlpha=1;g.fillStyle=p>.5?'#000':'#5a6b78';g.fillText(CL[k]+' '+Math.round(p*100)+'%',ox+14,oy(k)+4)}
+ g.fillStyle='#5a6b78';g.fillText('1. Latido recortado (58 datos)',8,H-6);g.fillText('2. 16 neuronas',hx-40,H-6);g.fillText('3. Resultado',ox-20,H-6)}
+setInterval(()=>{if(!sigNet)return;livex=sigFeat(S,performance.now()/1000,S.amp);livep=sigNet.fwd(livex);const m=argmax(livep);
+ $('nnV').textContent='Red neuronal: '+CL[m]+' ('+Math.round(livep[m]*100)+'%)';if($('labModal').classList.contains('on'))drawNet()},500);
+const PRE={'Ritmo normal':{},'Bradicardia':{bpm:45},'Taquicardia':{bpm:140},'QRS ancho':{wQ:1.9},'T invertida':{aT:-1},'Sin onda P':{aP:0}};
+for(const n in PRE){const b=document.createElement('button');b.textContent=n;b.onclick=()=>setS(PRE[n],n==='Ritmo normal'?'Normal':n);$('presets').appendChild(b)}
+$('a_lab').onclick=()=>{$('admModal').classList.remove('on');$('labModal').classList.add('on')};$('sigTrain').onclick=trainSig;$('tTrain').onclick=trainTutor;
+$('tTest').oninput=()=>{const r=tutorPredict($('tTest').value);$('tOut').innerHTML=r.map(([k,p])=>'<div style="display:flex;gap:6px;align-items:center;font-size:12px"><div style="width:'+Math.round(p*150)+'px;height:8px;background:#0f5f8a;border-radius:4px"></div>'+esc(k.split('|')[0])+' '+Math.round(p*100)+'%</div>').join('')||'<small>No reconozco ninguna palabra todavía.</small>'};
+trainSig();trainTutor();
+
+
+/* ===== Explicaciones en vivo, casos, latido anotado ===== */
+const fc=v=>String(v).replace('.',',');
+function explain(k){const rr=60/S.bpm,v=S[k];let sev='ok',title='',text='',ask=null;
+ if(k==='bpm'){const b=Math.round(v);
+  if(b<60){sev=b<45?'alert':'warn';title='Bradicardia: '+b+' lpm';text='El corazón late más lento de lo normal (menos de 60 por minuto). Cada latido dura '+fc(rr.toFixed(2))+' s, por eso ves más línea plana entre un QRS y el siguiente. Puede ser normal en deportistas o al dormir; con mareo o desmayo hay que estudiarla.';ask=['¿Qué es la bradicardia?','paciente bradicardia']}
+  else if(b<=100){title='Ritmo normal: '+b+' lpm';text='Está entre 60 y 100 latidos por minuto. Cada latido dura '+fc(rr.toFixed(2))+' s. Observa que cada QRS va precedido de una onda P y seguido de una T.';ask=['¿Cuáles son los rangos normales de FC?','rangos fc']}
+  else{sev=b>150?'alert':'warn';title='Taquicardia: '+b+' lpm';text='Más de 100 latidos por minuto: cada latido dura solo '+fc(rr.toFixed(2))+' s y las ondas se juntan (se acorta el espacio T-P). Es normal con ejercicio, fiebre o miedo; en reposo hay que investigarla. En este simulador todo el latido se comprime al subir la frecuencia.';ask=['¿Qué es la taquicardia?','paciente taquicardia']}}
+ else if(k==='amp'){title='Ganancia ×'+fc(v.toFixed(2))+' ('+Math.round(10*v)+' mm/mV)';sev=Math.abs(v-1)<.06?'ok':'info';text=sev==='ok'?'Es el tamaño estándar: 10 mm de alto por cada milivoltio (1 mV).':'Cambia el tamaño de TODAS las ondas a la vez, como la perilla de ganancia del electrocardiógrafo. No cambia el diagnóstico, solo la escala; por eso todo ECG debe llevar su calibración (10 mm/mV).';ask=['¿Cómo se calibra el ECG?','calibracion']}
+ else if(k==='aP'){
+  if(v<.15){sev='alert';title='Sin onda P';text='No se ve la activación de las aurículas. Con ritmo irregular puede ser fibrilación auricular; también ocurre cuando el impulso nace fuera del nodo sinusal. Sin onda P no se puede decir que el ritmo sea sinusal.';ask=['¿Qué es la onda P?','onda p']}
+  else if(v>1.8){sev='warn';title='Onda P alta';text='Una P alta y puntiaguda puede sugerir crecimiento de la aurícula derecha. Compara con la P normal punteada.';ask=['¿Qué es la onda P?','onda p']}
+  else if(v<.5){sev='info';title='Onda P pequeña';text='La despolarización auricular se ve muy pequeña. Puede ser variación normal entre personas o derivaciones, pero obsérvala con atención.';ask=['¿Qué es la onda P?','onda p']}
+  else{title='Onda P normal';text='Es la activación de las aurículas: pequeña y redondeada, justo antes del QRS. Su presencia antes de cada QRS indica que el impulso nace en el nodo sinusal.';ask=['¿Qué es la onda P?','onda p']}}
+ else if(k==='aQ'){
+  if(v>1.6){sev='warn';title='QRS de voltaje alto';text='Los ventrículos generan una señal más grande. Puede verse en hipertrofia ventricular, o en personas delgadas y jóvenes sin enfermedad.';ask=['¿Qué es la hipertrofia ventricular?','hipertrofia ventricular']}
+  else if(v<.5){sev='warn';title='QRS de voltaje bajo';text='Señal ventricular pequeña. Se asocia a derrame pericárdico, obesidad, enfisema o electrodos mal pegados.';ask=['¿Qué es el complejo QRS?','complejo qrs']}
+  else{title='QRS normal';text='Es la activación rápida de los ventrículos: la deflexión más alta y angosta del latido.';ask=['¿Qué es el complejo QRS?','complejo qrs']}}
+ else if(k==='wQ'){const ms=Math.round(1150*G().w);
+  if(ms>120){sev=ms>150?'alert':'warn';title='QRS ancho (~'+ms+' ms)';text='Los ventrículos tardan más de 120 ms en activarse. Es típico de bloqueo de rama o de un latido que nace en el propio ventrículo. Fíjate en la banda roja del latido anotado: se ensancha.';ask=['¿Qué es un bloqueo de rama?','bloqueo de rama']}
+  else if(v<.8){sev='info';title='QRS muy angosto (~'+ms+' ms)';text='Activación ventricular rapidísima por el sistema His-Purkinje: es lo habitual en ritmos que nacen por encima del ventrículo.';ask=['¿Qué es el complejo QRS?','complejo qrs']}
+  else{title='QRS de ancho normal (~'+ms+' ms)';text='Normal: menos de 120 ms. Significa que el impulso viaja rápido por las fibras de Purkinje.';ask=['¿Qué es el complejo QRS?','complejo qrs']}}
+ else if(k==='aT'){
+  if(v<-.1){sev='alert';title='Onda T invertida';text='La recuperación ventricular va en sentido contrario. Puede indicar isquemia o sobrecarga del ventrículo. Compara con la T normal punteada.';ask=['¿Qué es la isquemia?','isquemia miocárdica']}
+  else if(v<.3){sev='warn';title='Onda T aplanada';text='La T casi no se ve. Puede deberse a alteraciones electrolíticas, medicamentos o isquemia leve.';ask=['¿Qué es la onda T?','onda t']}
+  else if(v>2){sev='warn';title='Onda T alta y picuda';text='Una T muy alta puede aparecer con potasio alto (hiperpotasemia). Es una urgencia si se confirma.';ask=['¿Qué papel tiene el potasio?','potasio']}
+  else{title='Onda T normal';text='Es la recuperación (repolarización) de los ventrículos: positiva, redondeada y asimétrica.';ask=['¿Qué es la onda T?','onda t']}}
+ else if(k==='posT'){const ms=Math.round(v*1000);
+  if(v>.03){sev='warn';title='T más tardía: QT más largo';text='La recuperación tarda más en completarse, así que el intervalo QT se alarga ('+ms+' ms más tarde). Un QT largo aumenta el riesgo de arritmias graves.';ask=['¿Qué es el QT largo?','qt largo']}
+  else if(v<-.03){sev='info';title='T más temprana: QT más corto';text='La recuperación termina antes y el intervalo QT se acorta. Observa la barra QT del latido anotado.';ask=['¿Qué es el intervalo QT?','intervalo qt']}
+  else{title='T en su sitio';text='La onda T ocurre cuando debe y el intervalo QT es normal.';ask=['¿Qué es el intervalo QT?','intervalo qt']}}
+ else if(k==='spd'){if(Math.abs(v-25)<1.3){title='Papel a 25 mm/s (estándar)';text='Con esta velocidad 1 cuadro grande (5 mm) equivale a 0,2 s. Es la referencia para calcular frecuencia e intervalos.'}
+  else{sev='info';title='Papel a '+v+' mm/s';text=v>25?'Más rápido: la señal se estira, ves más detalle de cada onda pero caben menos latidos. La frecuencia no cambió, solo cómo se dibuja.':'Más lento: la señal se comprime y cabe más tiempo en pantalla. La frecuencia no cambió, solo cómo se dibuja.';text+=' Por eso la velocidad siempre se anota en el ECG.'}ask=['¿Qué es la velocidad del papel?','velocidad papel']}
+ else if(k==='off'){if(Math.abs(v)>.15){sev='warn';title='Línea base desplazada';text='Toda la señal sube o baja. En la vida real se llama deriva de línea base: respiración, movimiento o electrodos mal pegados. No es una enfermedad, es un artefacto.';ask=['¿Qué es un artefacto?','artefacto']}
+  else{title='Línea base en su sitio';text='La línea isoeléctrica es la referencia desde la que se miden todas las ondas.';ask=['¿Qué es la línea isoeléctrica?','línea isoeléctrica']}}
+ return{sev,title,text,ask}}
+let askH=null;
+function showExplain(x){const b=$('xbox');b.dataset.sev=x.sev;$('xh').textContent=(x.sev==='ok'?'✅ ':x.sev==='warn'?'⚠️ ':x.sev==='alert'?'🚨 ':'💡 ')+x.title;$('xt').textContent=x.text;
+ const a=$('xAsk');if(x.ask){a.classList.remove('off');a.textContent='💬 Cuéntame más: '+x.ask[0];a.onclick=()=>send(x.ask[0],x.ask[1])}else a.classList.add('off')}
+let FL={w:null,t0:0},caso=null;
+const FW={bpm:'RR',aP:'P',aQ:'QRS',wQ:'QRS',aT:'T',posT:'T',amp:'ALL'};
+function onChange(k){caso=null;markCasos();syncSliders();refresh();showExplain(explain(k));FL={w:FW[k]||null,t0:performance.now()};trackCtl(k);tgNotifySoon()}
+const CASOS=[['Normal',{},{sev:'ok',title:'Ritmo normal: todo en su sitio',text:'Valores normales del adulto: 75 lpm, una P pequeña antes de cada QRS, QRS angosto y T positiva. Úsalo como referencia (línea punteada) y compara con los demás casos.',ask:['¿Cómo leo un ECG normal?','metodo lectura ecg']}],
+['Bradicardia',{bpm:45}],['Taquicardia',{bpm:140}],['QRS ancho',{wQ:1.9}],['T invertida',{aT:-1}],['Sin onda P',{aP:0}],
+['Potasio alto',{aT:2.6,aP:.4,wQ:1.3},{sev:'alert',title:'Caso «Potasio alto»: T picuda, P pequeña, QRS ensanchado',text:'Con hiperpotasemia la T se vuelve alta y puntiaguda, la P se aplana y el QRS se ensancha. Es una urgencia: puede evolucionar a arritmias graves.',ask:['¿Qué papel tiene el potasio?','potasio']}],
+['Voltaje bajo',{aQ:.35,aT:.5},{sev:'warn',title:'Caso «Voltaje bajo»: ondas pequeñas',text:'QRS y T pequeños en general. Se asocia a derrame pericárdico, obesidad, enfisema o mala colocación de electrodos. Revisa primero que los electrodos estén bien pegados.',ask:['¿Cómo se colocan los electrodos?','colocacion de electrodos']}]];
+const CK={Bradicardia:'bpm',Taquicardia:'bpm','QRS ancho':'wQ','T invertida':'aT','Sin onda P':'aP'};
+function markCasos(){document.querySelectorAll('#casos button').forEach(b=>b.classList.toggle('on',b.textContent===caso))}
+function setS(o,name){Object.assign(S,D,o);caso=name;syncSliders();refresh();markCasos();
+ const c=CASOS.find(x=>x[0]===name);let x=c&&c[2];if(!x){x=explain(CK[name]||'bpm');if(name&&name!=='Normal')x={...x,title:'Caso «'+name+'»: '+x.title}}
+ showExplain(x);FL={w:'ALL',t0:performance.now()};trackCaso(name);tgCaso=name;tgNotifySoon()}
+CASOS.forEach(([n,o])=>{const b=document.createElement('button');b.textContent=n;b.onclick=()=>setS(o,n);$('casos').appendChild(b)});
+$('resetBtn').onclick=()=>setS({},'Normal');
+$('pauseBtn').onclick=()=>{paused=!paused;lg('pausa',paused?'Pausó el trazo':'Reanudó el trazo');$('pauseBtn').textContent=paused?'▶ Reanudar trazo':'⏸ Pausar trazo';
+ if(paused)showExplain({sev:'info',title:'Trazo en pausa',text:'Las 12 derivaciones quedaron congeladas para que puedas medir ondas con calma. El latido anotado y las medidas siguen respondiendo a los controles.',ask:null})};
+document.querySelectorAll('.tabs [data-tab]').forEach(b=>b.onclick=()=>{const t=b.dataset.tab;lg('vista',t==='beat'?'Latido anotado':'Trazo en vivo');document.querySelectorAll('#zoomBox .tabs button').forEach(x=>x.classList.toggle('on',x===b));
+ $('tabBeat').classList.toggle('off',t!=='beat');$('tabLive').classList.toggle('off',t!=='live');if(t==='live'){resize();zoomO.t=0}});
+
+/* geometría y medidas del latido (derivación II del simulador) */
+function G(s=S){const rr=60/s.bpm,k=Math.min(1,Math.pow(rr/.8,.75)),w=.09*s.wQ*k,c=.30*k,tC=c+.22*k+s.posT;
+ return{rr,k,w,c,pS:.085*k,pE:.195*k,qS:c-.5*w,qE:c+.65*w,tS:tC-.1*k,tE:tC+.1*k}}
+function measItems(){const g=G(),b=Math.round(S.bpm),qrs=Math.round(1150*g.w),pr=Math.round((g.qS-g.pS)*1000),qt=(g.tE-g.qS),qtc=Math.round(qt/Math.sqrt(g.rr)*1000),noP=S.aP<.15;
+ const it=[
+ ['FC',b+' lpm',b<60||b>100?(b<45||b>150?'alert':'warn'):'ok',b<60?'baja':b>100?'alta':'normal','60–100','frecuencia cardíaca','¿Qué es la frecuencia cardíaca?'],
+ ['P',noP?'ausente':Math.round(110*g.k)+' ms',noP?'alert':S.aP>1.8||S.aP<.5?'warn':'ok',noP?'sin activación auricular':S.aP>1.8?'alta':S.aP<.5?'pequeña':'normal','< 120 ms','onda p','¿Qué es la onda P?'],
+ ['PR',noP?'—':pr+' ms',noP||b>110?'info':pr<120?'warn':pr<=200?'ok':pr<=240?'warn':'alert',noP?'no medible':b>110?'se comprime con la FC':pr<120?'corto':pr<=200?'normal':'largo','120–200 ms','intervalo pr','¿Qué es el intervalo PR?'],
+ ['QRS','~'+qrs+' ms',qrs<=110?'ok':qrs<=120?'warn':'alert',qrs<=110?'normal':qrs<=120?'límite':'ancho','< 120 ms','complejo qrs','¿Qué es el complejo QRS?'],
+ ['QTc',qtc+' ms',b<55||b>110?'info':qtc>470||qtc<320?'alert':qtc>450||qtc<340?'warn':'ok',b<55||b>110?'poco fiable a esta FC':qtc>450?'largo':qtc<340?'corto':'normal','340–450 ms','intervalo qt','¿Qué es el intervalo QT?']];
+ return it}
+function renderMeas(){const it=measItems();$('meas').innerHTML='';it.forEach(([n,v,sv,w,r,key,q])=>{const e=document.createElement('button');e.className='chip';e.dataset.s=sv;e.innerHTML='<span><b>'+n+'</b>'+v+'</span><small>'+w+' · normal '+r+'</small>';e.onclick=ev=>{ev.stopPropagation();lg('medida',n);send(q,key)};$('meas').appendChild(e)})}
+const bc=$('beatC'),bg=bc.getContext('2d'),S0={bpm:75,amp:1,aP:1,aQ:1,wQ:1,aT:1,posT:0,spd:25,off:0};
+function drawBeat(now){if($('tabBeat').classList.contains('off'))return;const w=bc.width=bc.clientWidth,h=bc.height=bc.clientHeight;if(!w||!h)return;
+ const g=G(),W=Math.min(1.6,g.rr+g.c+.12),X=t=>6+(w-12)*t/W,base=h*.62,ppm=h*.2,Y=v=>base-v*ppm,m=LEADS.II[1];
+ bg.fillStyle='#fff5f5';bg.fillRect(0,0,w,h);bg.lineWidth=1;
+ for(let t=0;t<=W;t+=.04){const big=Math.abs(t/.2-Math.round(t/.2))<.01;bg.strokeStyle=big?'#e98f8f':'#f6cccc';bg.beginPath();bg.moveTo(X(t),0);bg.lineTo(X(t),h);bg.stroke()}
+ for(let v=-3;v<=4;v+=.1){const big=Math.abs(v*2-Math.round(v*2))<.01;bg.strokeStyle=big?'#e98f8f':'#f6cccc';bg.beginPath();bg.moveTo(0,Y(v));bg.lineTo(w,Y(v));bg.stroke()}
+ const pulse=Math.max(0,1-(now-FL.t0)/1800),all=FL.w==='ALL';
+ const B=[['P',g.pS,g.pE,'59,130,246'],['QRS',g.qS,g.qE,'225,29,72'],['T',g.tS,g.tE,'22,163,74']];
+ bg.font='600 11px system-ui,sans-serif';bg.textAlign='center';
+ B.forEach(([n,a,b,c])=>{const hot=all||FL.w===n,al=.09+(hot?.3*pulse:0);bg.fillStyle='rgba('+c+','+al+')';bg.fillRect(X(a),0,X(b)-X(a),h);
+  bg.fillStyle='rgb('+c+')';bg.fillText(n==='P'&&S.aP<.15?'P ✕':n,(X(a)+X(b))/2,12)});
+ bg.save();bg.beginPath();bg.rect(0,0,w,h);bg.clip();
+ bg.setLineDash([4,3]);bg.strokeStyle='#8b99a5';bg.lineWidth=1.5;bg.beginPath();
+ for(let i=0;i<=200;i++){const t=W*i/200,x=X(t),y=Y(ecgP(S0,t,m,1));i?bg.lineTo(x,y):bg.moveTo(x,y)}bg.stroke();bg.setLineDash([]);
+ bg.strokeStyle='#0b3d5c';bg.lineWidth=2.2;bg.lineJoin='round';bg.beginPath();
+ for(let i=0;i<=320;i++){const t=W*i/320,x=X(t),y=Y(ecgP(S,t,m,S.amp));i?bg.lineTo(x,y):bg.moveTo(x,y)}bg.stroke();bg.restore();
+ const br=(a,b,y,txt,c)=>{bg.strokeStyle=c;bg.fillStyle=c;bg.lineWidth=1.5;bg.beginPath();bg.moveTo(X(a),y-4);bg.lineTo(X(a),y+4);bg.moveTo(X(a),y);bg.lineTo(X(b),y);bg.moveTo(X(b),y-4);bg.lineTo(X(b),y+4);bg.stroke();bg.font='600 10px system-ui,sans-serif';bg.textAlign='left';bg.fillText(txt,Math.min(X(a),w-86),y-4)};
+ if(S.aP>=.15)br(g.pS,g.qS,h-26,'PR '+Math.round((g.qS-g.pS)*1000)+' ms','#1d4ed8');
+ br(g.qS,g.tE,h-10,'QT '+Math.round((g.tE-g.qS)*1000)+' ms','#15803d');
+ if(g.c+g.rr<=W*.99){const hot=all||FL.w==='RR',y=26;bg.strokeStyle=hot&&pulse>0?'#e07a00':'#7a4a00';bg.fillStyle=bg.strokeStyle;bg.lineWidth=hot&&pulse>0?2.5:1.5;bg.beginPath();bg.moveTo(X(g.c),y);bg.lineTo(X(g.c+g.rr),y);bg.stroke();bg.font='600 10px system-ui,sans-serif';bg.textAlign='center';bg.fillText('R-R '+fc(g.rr.toFixed(2))+' s',X(g.c+g.rr/2),y-3)}}
+syncSliders();
+
+/* ===== Sesión del estudiante, registro, paciente interactivo e informe ===== */
+const SKEY='ecgSes',hx=x=>String(x??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fT=ms=>new Date(ms).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const fD=ms=>new Date(ms).toLocaleString('es',{dateStyle:'long',timeStyle:'short'});
+const fU=ms=>{const q=Math.max(1,Math.round(ms/1000)),m=Math.floor(q/60);return m?m+' min '+(q%60)+' s':q+' s'};
+const first=n=>String(n||'').trim().split(/\s+/)[0]||'estudiante';
+let svT=null;function saveSes(){clearTimeout(svT);svT=setTimeout(saveNow,500)}
+function saveNow(){if(!SES)return;try{localStorage.setItem(SKEY,JSON.stringify(SES))}catch(e){try{localStorage.setItem(SKEY,JSON.stringify({...SES,snaps:SES.snaps.map(x=>({...x,img:''}))}))}catch(e2){}}}
+function loadSes(){try{return JSON.parse(localStorage.getItem(SKEY)||'null')}catch(e){return null}}
+const newSes=(name,email)=>({id:Date.now().toString(36),name,email,start:Date.now(),end:null,chat:[],ev:[],snaps:[],ctl:{},casos:{},leads:{},meas:{}});
+function lg(k,d){if(!SES||SES.end)return;SES.ev.push({t:Date.now(),k,d});saveSes()}
+const cT={};
+function trackCtl(k){if(!SES)return;const c=SES.ctl[k]||(SES.ctl[k]={n:0,min:S[k],max:S[k],last:S[k]});c.min=Math.min(c.min,S[k]);c.max=Math.max(c.max,S[k]);c.last=S[k];
+ clearTimeout(cT[k]);cT[k]=setTimeout(()=>{c.n++;lg('control',{k,v:S[k]})},700);snapSoon('Ajuste de «'+SL.find(x=>x[0]===k)[1]+'»',2600)}
+function trackCaso(n){if(!SES)return;SES.casos[n]=(SES.casos[n]||0)+1;lg('caso',n);snapSoon('Caso «'+n+'»',700,true)}
+function trackLead(l){if(!SES)return;SES.leads[l]=(SES.leads[l]||0)+1;lg('derivacion',l)}
+let snT=null,lastSnap=0;
+function snapSoon(label,ms,force){clearTimeout(snT);snT=setTimeout(()=>{if(force||Date.now()-lastSnap>9000)snap(label)},ms)}
+function wrapTxt(g,t,x,y,w,lh,max){const ws=String(t).split(/\s+/);let l='',n=0;for(const q of ws){const tt=l?l+' '+q:q;if(g.measureText(tt).width>w&&l){g.fillText(l,x,y);y+=lh;l=q;if(++n>=max)return y}else l=tt}if(l){g.fillText(l,x,y);y+=lh}return y}
+function renderSnap(label,maxW,q){const nm=SES?SES.name:'Simulador ECG';const L=canv.filter(o=>!o.zoom);if(!L.length||!L[0].w)return null;
+ const cw=L[0].w,ch=L[0].h,gap=8,head=34,rw=330,GW=4*cw+5*gap,W=GW+rw,H=head+3*ch+4*gap;
+ const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+ const AL=alarmEval();g.fillStyle='#e6edf3';g.fillRect(0,0,W,H);g.fillStyle=AL.lvl===2?'#c0121f':AL.lvl===1?'#b87800':'#0f5f8a';g.fillRect(0,0,W,head-4);
+ g.fillStyle='#fff';g.font='600 15px system-ui,sans-serif';g.textBaseline='middle';g.fillText((AL.lvl===2?'🚨 ALARMA · ':AL.lvl===1?'⚠️ ALERTA · ':'')+'Simulador ECG · '+label,12,(head-4)/2);g.textAlign='right';g.font='12px system-ui,sans-serif';g.fillText(nm+' · '+fT(Date.now()),W-12,(head-4)/2);g.textAlign='left';
+ L.forEach((o,i)=>{const x=gap+(i%4)*(cw+gap),y=head+gap+Math.floor(i/4)*(ch+gap);g.fillStyle='#fff5f5';g.fillRect(x,y,cw,ch);
+  for(let q=0;q<=cw;q+=5){g.fillStyle=q%25?'#f6cccc':'#e98f8f';g.fillRect(x+q,y,1,ch)}for(let q=0;q<=ch;q+=5){g.fillStyle=q%25?'#f6cccc':'#e98f8f';g.fillRect(x,y+q,cw,1)}
+  g.drawImage(o.cv,x,y);g.fillStyle='#0b3d5c';g.font='700 13px system-ui,sans-serif';g.textBaseline='top';g.fillText(o.lead,x+6,y+5);g.textBaseline='middle'});
+ const rx=GW+gap*2,bw=rw-gap*3;let y=head+gap;
+ g.fillStyle='#fff';g.fillRect(rx-4,y-4,bw+8,H-y-gap+4);g.textBaseline='top';
+ if(bc.width>0&&!$('tabBeat').classList.contains('off')){g.drawImage(bc,rx,y,bw,bw*bc.height/bc.width);y+=bw*bc.height/bc.width+8}
+ g.fillStyle='#1d2b36';g.font='700 13px system-ui,sans-serif';g.fillText('FC '+Math.round(S.bpm)+' lpm · '+dx(),rx,y);y+=20;g.font='12px system-ui,sans-serif';
+ measItems().forEach(([n,v,sv,w])=>{g.fillStyle={ok:'#1f9d55',warn:'#c78a00',alert:'#d6322b',info:'#5a6b78'}[sv];g.fillText('● '+n+': '+v+' — '+w,rx,y);y+=17});
+ y+=6;g.fillStyle='#41525f';g.fillText('Ganancia ×'+S.amp.toFixed(2)+' · '+S.spd+' mm/s · línea base '+S.off.toFixed(2),rx,y);y+=22;
+ g.fillStyle='#0f5f8a';g.font='700 12px system-ui,sans-serif';y=wrapTxt(g,$('xh').textContent,rx,y,bw,16,3)+3;g.fillStyle='#41525f';g.font='11.5px system-ui,sans-serif';wrapTxt(g,$('xt').textContent,rx,y,bw,15,12);
+ const sc=Math.min(1,(maxW||880)/W),o2=document.createElement('canvas');o2.width=Math.round(W*sc);o2.height=Math.round(H*sc);o2.getContext('2d').drawImage(c,0,0,o2.width,o2.height);
+ return o2.toDataURL('image/jpeg',q||.62)}
+function snap(label){if(!SES)return false;const img=renderSnap(label);if(!img)return false;SES.snaps.push({t:Date.now(),label,img});if(SES.snaps.length>14)SES.snaps.splice(1,1);lastSnap=Date.now();SES.ev.push({t:Date.now(),k:'captura',d:label});saveSes();return true}
+
+/* ===== Alarma de paciente en peligro ===== */
+function alarmEval(){const g=G(),b=Math.round(S.bpm),qrs=Math.round(1150*g.w),qtc=Math.round((g.tE-g.qS)/Math.sqrt(g.rr)*1000),noP=S.aP<.15,o=[];
+ const add=(l,code,txt,ctx)=>o.push({l,code,txt,ctx});
+ if(b<40)add(2,'brad','Bradicardia severa ('+b+' lpm)','riesgo de bajo gasto cardíaco, síncope o paro');else if(b<50)add(1,'brad','Bradicardia ('+b+' lpm)','vigilar mareo y síncope');
+ if(b>150)add(2,'taq','Taquicardia severa ('+b+' lpm)','riesgo de inestabilidad hemodinámica');else if(b>130)add(1,'taq','Taquicardia ('+b+' lpm)','buscar causa: dolor, fiebre, hipovolemia o arritmia');
+ if(qrs>150)add(2,'qrs','QRS muy ancho (~'+qrs+' ms)','posible ritmo ventricular, bloqueo de rama o hiperpotasemia');else if(qrs>120)add(1,'qrs','QRS ancho (~'+qrs+' ms)','trastorno de la conducción ventricular');
+ if(noP)add(b>120||qrs>120?2:1,'p','Sin onda P','posible fibrilación auricular o ritmo no sinusal');
+ if(S.aT<-.1)add(qrs>120?2:1,'t','Onda T invertida','posible isquemia o sobrecarga ventricular');
+ if(S.aT>2&&(S.aP<.5||S.wQ>1.2))add(2,'k','Patrón de hiperpotasemia','T picuda con P aplanada o QRS ancho: urgencia metabólica');else if(S.aT>2)add(1,'k','Onda T alta y picuda','pensar en potasio alto');
+ if(b>=55&&b<=110){if(qtc>500)add(2,'qt','QT muy prolongado (QTc '+qtc+' ms)','riesgo de torsades de pointes');else if(qtc>470)add(1,'qt','QT prolongado (QTc '+qtc+' ms)','riesgo de arritmias ventriculares')}
+ const m=String(P.pa||'').match(/(\d{2,3})\s*[\/-]\s*(\d{2,3})/);if(m&&(+m[1]>=180||+m[2]>=120))add(1,'pa','Crisis hipertensiva en la ficha ('+m[1]+'/'+m[2]+')','requiere atención inmediata');
+ o.sort((x,y)=>y.l-x.l);return{lvl:o.length?o[0].l:0,items:o}}
+const patLabel=()=>P.nombre?(P.nombre+(P.edad?' · '+P.edad+' a':'')+(P.sexo?' · '+P.sexo:'')):'Paciente simulado';
+let ALK='',alT=null,ALSENT=0;
+function alarmUpdate(){const a=alarmEval(),k=a.items.map(x=>x.code+x.l).sort().join(',');
+ document.body.classList.toggle('al2',a.lvl===2);document.body.classList.toggle('al1',a.lvl===1);
+ if(a.lvl){const t=(a.lvl===2?'ALARMA · PACIENTE EN PELIGRO: ':'ALERTA · REVISAR AL PACIENTE: ')+a.items.map(x=>x.txt).join(' · ');$('alTx').textContent=t;$('alTx').title=t;$('alP').textContent=patLabel()}
+ if(k!==ALK){const prev=ALK;ALK=k;clearTimeout(alT);alT=setTimeout(()=>alarmSettled(prev),2200)}}
+function alarmSettled(prev){const a=alarmEval(),k=a.items.map(x=>x.code+x.l).sort().join(',');if(k!==ALK)return;
+ if(a.lvl)lg('alarma',(a.lvl===2?'ALARMA: ':'Alerta: ')+a.items.map(x=>x.txt).join('; '));else if(prev)lg('alarma','Alarma resuelta: el paciente vuelve a parámetros estables');
+ tgAlarm(a,!!prev)}
+async function tgAlarm(a,hadPrev){if(!TG.on||!tgReady()||!NET)return;
+ if(!a.lvl){if(!ALSENT)return;ALSENT=0;const d=tgDiff();const cap='✅ ALARMA RESUELTA\n👤 '+patLabel()+'\nEl paciente vuelve a parámetros estables.'+(d.length?'\n\nCambios realizados:\n'+d.join('\n'):'')+'\n\n'+estadoCore();TGBASE={...S};tgCaso=null;try{await tgPhoto(cap)}catch(e){}return}
+ const d=tgDiff(),ant=P.ant?'\nAntecedentes: '+P.ant:'';
+ const cap=(a.lvl===2?'🚨🚨 ALARMA — PACIENTE EN PELIGRO 🚨🚨':'⚠️ ALERTA — REVISAR AL PACIENTE')+'\n👤 '+patLabel()+(P.peso?' · '+P.peso+' kg':'')+(P.pa?' · PA '+P.pa:'')+ant+'\n\nCondición:\n'+a.items.map(x=>(x.l===2?'🔴 ':'🟡 ')+x.txt+' — '+x.ctx).join('\n')+(d.length?'\n\nCambios que la provocaron:\n'+d.join('\n'):'')+'\n\n'+estadoCore()+'\n\n🩺 (Simulación educativa) '+(a.lvl===2?'Evalúa pulso, respiración y conciencia, pide ayuda y sigue el protocolo del curso.':'Revisa al paciente y confirma los hallazgos.');
+ ALSENT=a.lvl;TGBASE={...S};tgCaso=null;try{await tgPhoto(cap)}catch(e){}}
+
+/* paciente interactivo */
+const KW=[[/hipertens|presion alta/,'Hipertensión','puede causar hipertrofia ventricular (QRS de voltaje alto).'],[/diabet/,'Diabetes','aumenta el riesgo de isquemia silenciosa.'],[/infarto|\biam\b/,'Infarto previo','busca ondas Q patológicas y cambios del ST y la T.'],[/marcapaso/,'Marcapasos','verifica las espigas y la captura.'],[/arritm|fibrilaci|palpitac/,'Arritmia','observa la regularidad del ritmo y la onda P.'],[/fum|tabaq|cigarr/,'Tabaquismo','factor de riesgo cardiovascular.'],[/colesterol|dislipid/,'Colesterol alto','factor de riesgo de isquemia.'],[/sincope|desmayo|mareo/,'Síncope o mareo','relaciónalo con bradicardia o bloqueos.'],[/obes/,'Obesidad','puede disminuir el voltaje del QRS.'],[/potasio|hiperpot/,'Alteración del potasio','mira la forma de la onda T.']];
+function patEval(){const o=[],age=+P.edad,hasA=P.edad!==undefined&&P.edad!=='',h=(+P.altura||0)/100,w=+P.peso,bpm=Math.round(S.bpm);
+ if(hasA){const gp=age<1?'Lactante':age<12?'Niño/a':age<18?'Adolescente':age<65?'Adulto/a':'Adulto/a mayor';o.push(['Grupo de edad',gp,'info',age<18?'En menores los valores de referencia cambian con la edad.':'']);
+  const r=age<1?[100,180]:age<3?[98,140]:age<6?[80,120]:age<12?[75,118]:[60,100],lo=bpm<r[0],hi=bpm>r[1];
+  o.push(['FC esperada por edad',r[0]+'–'+r[1]+' lpm',lo||hi?'warn':'ok','FC actual '+bpm+' lpm: '+(lo?'por debajo de lo esperado.':hi?'por encima de lo esperado.':'dentro de lo esperado.')+' (referencia orientativa)'])}
+ if(h&&w){const imc=w/(h*h),c=imc<18.5?['Bajo peso','warn']:imc<25?['Normal','ok']:imc<30?['Sobrepeso','warn']:['Obesidad','alert'];o.push(['IMC',imc.toFixed(1)+' · '+c[0],c[1],hasA&&age<18?'En menores se interpreta con percentiles.':'Un IMC alto se relaciona con hipertensión y menor voltaje del QRS.'])}
+ const m=String(P.pa||'').match(/(\d{2,3})\s*[\/-]\s*(\d{2,3})/);
+ if(m){const a=+m[1],b=+m[2],c=a>=180||b>=120?['Crisis hipertensiva','alert']:a>=140||b>=90?['Hipertensión etapa 2','alert']:a>=130||b>=80?['Hipertensión etapa 1','warn']:a>=120?['Presión elevada','warn']:a<90||b<60?['Presión baja','warn']:['Normal','ok'];o.push(['Presión arterial',a+'/'+b+' mmHg · '+c[0],c[1],'Referencia para adultos.'])}
+ const an=norm(P.ant||'');KW.forEach(([re,n,t])=>{if(re.test(an))o.push(['Antecedente',n,'warn','Para el ECG: '+t])});return o}
+function renderPat(){alarmUpdate();const el=$('patInfo');if(!el)return;const it=patEval();el.innerHTML='';
+ if(!it.length){el.innerHTML='<div class="full">Completa edad, peso, altura, presión y antecedentes: aquí verás IMC, presión, FC esperada y antecedentes relevantes. El tutor también usará estos datos en sus respuestas.</div>';return}
+ it.forEach(([l,v,sv,n])=>{const d=document.createElement('div');d.className='chip';d.dataset.s=sv;d.title=n||'';d.innerHTML='<span><b>'+hx(l)+'</b></span><small style="color:#1d2b36;font-size:12px">'+hx(v)+'</small>';el.appendChild(d)});
+ const ns=it.filter(x=>x[3]);if(ns.length){const dt=document.createElement('details');dt.innerHTML='<summary>Ver qué significa cada dato</summary><ul style="margin:4px 0;padding-left:18px">'+ns.map(x=>'<li><b>'+hx(x[0]+(x[0]==='Antecedente'?' · '+x[1]:''))+':</b> '+hx(x[3])+'</li>').join('')+'</ul>';el.appendChild(dt)}}
+let pT=null;
+['nombre','edad','sexo','altura','peso','pa','ant'].forEach(k=>{const e=$('p_'+k);e.value=P[k]||'';e.oninput=e.onchange=()=>{P[k]=e.value;try{localStorage.setItem('ecgPac',JSON.stringify(P))}catch(x){}renderPat();clearTimeout(pT);pT=setTimeout(()=>lg('paciente','Actualizó la ficha del paciente'),1500)};e.onclick=ev=>ev.stopPropagation()});
+
+
+/* informe */
+const REPORT_CSS=`.rw{font:13px/1.5 "Segoe UI",system-ui,sans-serif;color:#1d2b36;max-width:880px;margin:0 auto;background:#fff}.rw *{box-sizing:border-box}
+.rw .hd{background:linear-gradient(120deg,#0b3d5c,#0f5f8a);color:#fff;padding:22px 26px;border-radius:0 0 14px 14px;display:flex;justify-content:space-between;gap:20px;align-items:flex-end}
+.rw .hd h1{margin:0;font-size:26px;letter-spacing:.2px}.rw .hd p{margin:4px 0 0;opacity:.85;font-size:13px}.rw .hd .rt{text-align:right;font-size:12px;opacity:.9}
+.rw .body{padding:16px 26px 40px}.rw h2{font-size:16px;margin:22px 0 8px;color:#0b3d5c;padding-left:10px;border-left:5px solid #e07a00;break-after:avoid}
+.rw .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.rw .cd{border:1px solid #d5e0e9;border-radius:12px;padding:10px 14px;background:#f8fbfd;break-inside:avoid}
+.rw .cd b.t{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#5a6b78;margin-bottom:4px}
+.rw .kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}.rw .kp div{border-radius:12px;background:#eef5fa;padding:10px 12px;color:#5a6b78;font-size:11.5px;break-inside:avoid}.rw .kp b{display:block;font-size:22px;color:#0f5f8a;line-height:1.1}
+.rw table{width:100%;border-collapse:collapse;font-size:12px}.rw th{background:#0f5f8a;color:#fff;text-align:left;padding:6px 8px;font-weight:600}.rw td{padding:5px 8px;border-bottom:1px solid #e3ebf1;vertical-align:top}.rw tr:nth-child(even) td{background:#f6f9fc}.rw tr{break-inside:avoid}
+.rw .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}.rw .ok{background:#1f9d55}.rw .warn{background:#e0a000}.rw .alert{background:#d6322b}.rw .info{background:#8a99a6}
+.rw .figs{display:grid;grid-template-columns:1fr;gap:12px}.rw figure{margin:0;border:1px solid #d5e0e9;border-radius:10px;overflow:hidden;break-inside:avoid;background:#fff}.rw figure img{width:100%;display:block}.rw figcaption{padding:5px 9px;font-size:11px;color:#41525f;background:#f3f7fa}
+.rw .tl{border-left:2px solid #c9d8e4;margin-left:6px;padding-left:12px}.rw .tl div{margin:0 0 4px;font-size:12px;break-inside:avoid}.rw .tl span{color:#6b7c89;margin-right:6px;font-variant-numeric:tabular-nums}
+.rw .msg{display:grid;grid-template-columns:62px 82px 1fr;gap:6px;padding:5px 0;border-bottom:1px solid #edf2f6;font-size:12px;break-inside:avoid}.rw .msg .w{font-weight:700}.rw .msg .u{color:#0f5f8a}.rw .msg .a{color:#b45f00}.rw .msg .x{white-space:pre-wrap}.rw .msg .h{color:#6b7c89}
+.rw ul{margin:4px 0;padding-left:20px}.rw .note{font-size:11px;color:#6b7c89;margin-top:18px;border-top:1px solid #d5e0e9;padding-top:8px}.rw .rfoot{text-align:center;font-size:10px;color:#8696a3;margin-top:16px}
+@media print{@page{size:A4;margin:12mm}.rw{max-width:none}.rw .rfoot{position:fixed;left:0;right:0;bottom:0;margin:0}.rw .body{padding:12px 4px 30px}}`;
+{const st=document.createElement('style');st.textContent=REPORT_CSS;document.head.appendChild(st)}
+const EVT={alarma:d=>d,caso:d=>'Cargó el caso «'+d+'»',control:d=>'Ajustó «'+(SL.find(x=>x[0]===d.k)||[0,d.k])[1]+'» a '+(SL.find(x=>x[0]===d.k)?SL.find(x=>x[0]===d.k)[5](d.v):d.v),derivacion:d=>'Amplió la derivación '+d,vista:d=>'Cambió a la vista «'+d+'»',pausa:d=>d,medida:d=>'Consultó la medida '+d,paciente:d=>d,captura:d=>'Guardó una captura: '+d};
+const CONC={Bradicardia:'Bradicardia sinusal: FC menor de 60 lpm; relaciona con mareo, síncope y bloqueos.',Taquicardia:'Taquicardia sinusal: FC mayor de 100 lpm; causas fisiológicas y patológicas.','QRS ancho':'QRS ancho (>120 ms): bloqueos de rama y ritmos ventriculares.','T invertida':'Onda T invertida: isquemia y sobrecarga ventricular.','Sin onda P':'Ausencia de onda P: fibrilación auricular y ritmos no sinusales.','Potasio alto':'Hiperpotasemia: T picuda, P aplanada y QRS ancho (urgencia).','Voltaje bajo':'Bajo voltaje: derrame pericárdico, obesidad, enfisema, electrodos mal puestos.',Normal:'Lectura de un ECG normal como referencia.'};
+function buildReport(){const s=SES||newSes('Sin registro','—'),end=s.end||Date.now(),dur=end-s.start,fin=!!s.end;
+ const qs=s.chat.filter(m=>m.r==='u'&&!/^\/?admin$/i.test(m.x)),nc=Object.values(s.ctl).reduce((a,c)=>a+c.n,0),cs=Object.keys(s.casos),ls=Object.keys(s.leads),it=measItems(),pe=patEval();
+ const hasP=['nombre','edad','sexo','altura','peso','pa','ant'].some(k=>P[k]);
+ let h='<div class="rw"><div class="hd"><div><h1>Informe de aprendizaje</h1><p>Simulador de Electrocardiografía con Tutor IA · '+(fin?'Sesión finalizada':'Informe parcial de la sesión')+'</p></div><div class="rt">'+hx(fD(end))+'<br>ID de sesión '+hx(s.id)+'</div></div><div class="body">';
+ h+='<h2>1 · Datos del estudiante</h2><div class="g2"><div class="cd"><b class="t">Estudiante</b><b style="font-size:15px">'+hx(s.name)+'</b></div><div class="cd"><b class="t">Sesión</b>Inicio: '+hx(fD(s.start))+'<br>'+(fin?'Fin: '+hx(fD(s.end))+'<br>':'')+'Duración: <b>'+fU(dur)+'</b></div></div>';
+ h+='<div class="kp"><div><b>'+qs.length+'</b>preguntas al tutor</div><div><b>'+nc+'</b>ajustes en controles</div><div><b>'+cs.length+'</b>casos explorados de '+CASOS.length+'</div><div><b>'+ls.length+'/12</b>derivaciones ampliadas</div><div><b>'+s.snaps.length+'</b>capturas de pantalla</div><div><b>'+s.chat.filter(m=>m.r==='ai').length+'</b>respuestas del tutor</div></div>';
+ h+='<h2>2 · Datos del paciente simulado</h2>';
+ if(!hasP)h+='<p style="color:#6b7c89">El estudiante no completó la ficha del paciente en esta sesión.</p>';
+ else{h+='<table><tr><th style="width:30%">Dato</th><th>Valor</th></tr>'+[['Nombre',P.nombre],['Edad',P.edad&&P.edad+' años'],['Sexo',P.sexo],['Altura',P.altura&&P.altura+' cm'],['Peso',P.peso&&P.peso+' kg'],['Presión arterial',P.pa&&P.pa+' mmHg'],['Antecedentes',P.ant]].map(([a,b])=>'<tr><td>'+a+'</td><td>'+hx(b||'—')+'</td></tr>').join('')+'</table>';
+  if(pe.length)h+='<p style="margin:8px 0 2px"><b>Interpretación de referencia</b></p><table>'+pe.map(([l,v,sv,n])=>'<tr><td style="width:30%"><span class="dot '+sv+'"></span>'+hx(l)+'</td><td><b>'+hx(v)+'</b>'+(n?'<br><span style="color:#5a6b78">'+hx(n)+'</span>':'')+'</td></tr>').join('')+'</table>'}
+ h+='<h2>3 · Estado del ECG al cerrar el informe</h2><p style="margin:0 0 6px">Frecuencia <b>'+Math.round(S.bpm)+' lpm</b> · Diagnóstico automático: <b>'+hx(dx())+'</b> · Red neuronal: '+hx($('nnV').textContent.replace('Red neuronal: ',''))+'</p><table><tr><th>Medida</th><th>Valor</th><th>Interpretación</th><th>Rango normal</th></tr>'+it.map(([n,v,sv,w,r])=>'<tr><td><b>'+n+'</b></td><td>'+hx(v)+'</td><td><span class="dot '+sv+'"></span>'+hx(w)+'</td><td>'+hx(r)+'</td></tr>').join('')+'</table><p style="font-size:11px;color:#6b7c89;margin:4px 0 0">Medidas calculadas sobre el modelo simulado (derivación II); son aproximadas y con fines educativos.</p>';
+ h+='<h2>4 · Actividad en los controles de onda</h2><table><tr><th>Control</th><th>Ajustes</th><th>Rango explorado</th><th>Valor final</th></tr>'+SL.map(([k,l,,,,f])=>{const c=s.ctl[k];return '<tr><td>'+l+'</td><td>'+(c?c.n:'—')+'</td><td>'+(c?f(c.min)+' a '+f(c.max):'No utilizado')+'</td><td>'+f(S[k])+'</td></tr>'}).join('')+'</table>';
+ h+='<h2>5 · Casos y derivaciones explorados</h2><p style="margin:0 0 4px"><b>Casos:</b> '+(cs.length?cs.map(c=>hx(c)+' (×'+s.casos[c]+')').join(', '):'ninguno')+'</p><p style="margin:0"><b>Derivaciones ampliadas:</b> '+(ls.length?ls.map(l=>hx(l)+' (×'+s.leads[l]+')').join(', '):'ninguna')+'</p>';
+ if(s.snaps.length){h+='<h2>6 · Capturas de pantalla</h2><div class="figs">'+s.snaps.map((x,i)=>x.img?'<figure><img src="'+x.img+'"><figcaption><b>Captura '+(i+1)+'</b> · '+fT(x.t)+' · '+hx(x.label)+'</figcaption></figure>':'<figure><figcaption>Captura '+(i+1)+' (imagen no disponible)</figcaption></figure>').join('')+'</div>'}
+ const ev=s.ev.filter(e=>e.k!=='captura').slice(-90);
+ h+='<h2>7 · Cronología de la sesión</h2><div class="tl">'+(ev.length?ev.map(e=>'<div><span>'+fT(e.t)+'</span>'+hx((EVT[e.k]||(x=>x))(e.d))+'</div>').join(''):'<div>Sin acciones registradas.</div>')+'</div>'+(s.ev.length>90?'<p style="font-size:11px;color:#6b7c89">Se muestran las últimas 90 acciones.</p>':'');
+ h+='<h2>8 · Conversación completa con el tutor</h2>'+(s.chat.length?s.chat.map(m=>'<div class="msg"><span class="h">'+fT(m.t)+'</span><span class="w '+(m.r==='u'?'u':'a')+'">'+(m.r==='u'?hx(first(s.name)):'Tutor IA')+'</span><span class="x">'+hx(m.x)+'</span></div>').join(''):'<p>Sin mensajes.</p>');
+ const falt=CASOS.map(c=>c[0]).filter(c=>!s.casos[c]),unused=SL.filter(x=>!s.ctl[x[0]]).map(x=>x[1]);
+ h+='<h2>9 · Conceptos para repasar y próximos pasos</h2><ul>'+(cs.length?cs.filter(c=>CONC[c]).map(c=>'<li>'+hx(CONC[c])+'</li>').join(''):'')+(falt.length?'<li>Casos que faltó explorar: <b>'+falt.map(hx).join(', ')+'</b>.</li>':'<li>¡Exploraste todos los casos disponibles!</li>')+(unused.length?'<li>Controles que no usaste: '+unused.map(hx).join(', ')+'.</li>':'')+(ls.length<12?'<li>Amplía más derivaciones (viste '+ls.length+' de 12) y compara cómo cambia la forma de las ondas.</li>':'')+(qs.length<5?'<li>Haz más preguntas al tutor: cada pregunta refuerza un concepto.</li>':'')+'<li>Confirma cualquier duda con tu profesor o con el creador de la aplicación.</li></ul>';
+ h+='<div class="note">Este informe es un material educativo generado automáticamente por el Simulador de Electrocardiografía. Las señales son simuladas y las interpretaciones no sustituyen el criterio clínico ni se deben usar para decisiones médicas.</div><div class="rfoot">Simulador de Electrocardiografía · '+hx(s.name)+' · '+hx(fD(end))+'</div></div></div>';
+ return h}
+function printReport(){$('report').innerHTML=buildReport();window.print()}
+$('pdfBtn').onclick=e=>{e.stopPropagation();printReport()};
+function slug(x){return norm(x).replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'estudiante'}
+function reportFile(){return '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Informe ECG – '+hx(SES.name)+'</title><style>body{margin:0;background:#e9eff4}@media print{body{background:#fff}}'+REPORT_CSS+'</style></head><body>'+buildReport()+'</body></html>'}
+function summaryTxt(){const s=SES,qs=s.chat.filter(m=>m.r==='u'&&!/^\/?admin$/i.test(m.x)),cs=Object.keys(s.casos);
+ return 'Informe de aprendizaje – Simulador de Electrocardiografía\n\nEstudiante: '+s.name+'\nInicio: '+fD(s.start)+'\nDuración: '+fU((s.end||Date.now())-s.start)+'\nPreguntas al tutor: '+qs.length+'\nCasos explorados: '+(cs.join(', ')||'ninguno')+'\nDerivaciones ampliadas: '+Object.keys(s.leads).length+'/12\nCapturas: '+s.snaps.length+'\nEstado final: '+Math.round(S.bpm)+' lpm · '+dx()+''}
+function openEnd(){if(!SES)return;if(!SES.end){snap('Final de la sesión');SES.end=Date.now()}saveNow();const s=SES,qs=s.chat.filter(m=>m.r==='u'&&!/^\/?admin$/i.test(m.x));
+ $('endSum').innerHTML='<p style="margin:0 0 6px">Gracias, <b>'+hx(first(s.name))+'</b>. Tu informe incluye el historial completo del chat, '+s.snaps.length+' capturas de pantalla, tu actividad en los controles y los datos del paciente.</p><div class="kp"><div><b>'+fU(s.end-s.start)+'</b>duración</div><div><b>'+qs.length+'</b>preguntas</div><div><b>'+Object.keys(s.casos).length+'</b>casos</div></div>';
+ endTgUI();$('endModal').classList.add('on');if(TG.auto&&tgReady()&&!SES.sent)endSendTg()}
+$('endBtn').onclick=openEnd;
+$('e_back').onclick=()=>{SES.end=null;SES.sent=null;saveNow();$('endModal').classList.remove('on')};
+$('e_new').onclick=()=>{if(confirm('Se cerrará esta sesión y se borrará del equipo. ¿Ya descargaste tu informe?')){try{localStorage.removeItem(SKEY);localStorage.removeItem('ecgPac')}catch(e){}SES=null;location.reload()}};
+$('e_dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([reportFile()],{type:'text/html'}));a.download='Informe-ECG-'+slug(SES.name)+'-'+new Date().toISOString().slice(0,10)+'.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};
+$('e_pdf').onclick=printReport;
+addEventListener('beforeunload',e=>{if(SES&&!SES.end&&(SES.chat.length>2||SES.ev.length)){saveNow();e.preventDefault();e.returnValue=''}});
+
+/* ===== Telegram (configuración en la ventana admin) ===== */
+const TGK='ecgTg';let TG={token:'',chat:'',on:false,auto:true};
+try{TG={...TG,...JSON.parse(localStorage.getItem(TGK)||'{}')}}catch(e){}
+const saveTG=()=>{try{localStorage.setItem(TGK,JSON.stringify(TG))}catch(e){}};
+let NET=navigator.onLine,tgBot=null,tgLinking=false,tgOff=0,tgRun=false,tgReply=false,tgBusy=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),tgReady=()=>!!(TG.token&&TG.chat);
+async function tgApi(method,body,ms,form){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||15000);
+ try{const o={method:'POST',signal:c.signal};
+  if(form)o.body=body;else o.body=new URLSearchParams(Object.entries(body||{}).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):String(v)]));
+  const r=await fetch('https://api.telegram.org/bot'+TG.token+'/'+method,o),j=await r.json();if(!j.ok)throw new Error(j.description||'Error de Telegram');return j.result}finally{clearTimeout(t)}}
+async function netCheck(){let ok=navigator.onLine;if(ok){const c=new AbortController(),t=setTimeout(()=>c.abort(),5000);try{await fetch('https://api.telegram.org/',{mode:'no-cors',cache:'no-store',signal:c.signal})}catch(e){ok=false}clearTimeout(t)}NET=ok;paintTG();return ok}
+function tgMsg(t,bad){const e=$('tg_msg');e.textContent=t;e.style.color=bad?'#c2300a':'#41525f'}
+function paintTG(){$('tgNetIc').textContent=NET?'🟢':'🔴';$('tgNetTx').textContent=NET?'Conectado a internet':'Sin internet · la app sigue funcionando sin Telegram';
+ const b=$('tg_on');b.textContent=TG.on?'⏹ Deshabilitar interacción con Telegram':'▶ Habilitar interacción con Telegram';b.disabled=!TG.on&&!(NET&&tgReady());
+ $('tg_tok').value=TG.token;$('tg_chat').value=TG.chat;$('tg_auto').checked=!!TG.auto;
+ $('tgHdr').textContent=TG.on?(NET?'✈️🟢':'✈️🔴'):'';$('tgHdr').title=TG.on?(NET?'Telegram activo':'Telegram habilitado, sin internet'):''}
+$('tg_net').onclick=netCheck;addEventListener('online',()=>{netCheck()});addEventListener('offline',()=>{NET=false;paintTG()});
+setInterval(()=>{if(TG.on||$('admModal').classList.contains('on'))netCheck()},20000);
+document.querySelectorAll('[data-adm]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-adm]').forEach(x=>x.classList.toggle('on',x===b));$('admKB').classList.toggle('off',b.dataset.adm!=='kb');$('admTG').classList.toggle('off',b.dataset.adm!=='tg');if(b.dataset.adm==='tg'){paintTG();netCheck()}});
+$('tg_tok').onchange=()=>{TG.token=$('tg_tok').value.trim();tgBot=null;saveTG();paintTG()};
+$('tg_chat').onchange=()=>{TG.chat=$('tg_chat').value.trim();saveTG();paintTG()};
+$('tg_auto').onchange=()=>{TG.auto=$('tg_auto').checked;saveTG()};
+$('tg_ver').onclick=async()=>{TG.token=$('tg_tok').value.trim();saveTG();if(!TG.token){tgMsg('Pega primero el token del bot.',1);return}
+ tgMsg('Verificando…');try{tgBot=await tgApi('getMe');$('tg_bot').textContent='✅ @'+tgBot.username;tgMsg('Bot verificado. Ahora vincula tu chat.')}catch(e){$('tg_bot').textContent='❌';tgMsg(NET?'Token no válido: '+e.message:'Sin internet.',1)}paintTG()};
+$('tg_link').onclick=async()=>{TG.token=$('tg_tok').value.trim();saveTG();if(!TG.token){tgMsg('Pega primero el token del bot.',1);return}
+ if(!NET){tgMsg('Sin internet.',1);return}
+ try{if(!tgBot){tgBot=await tgApi('getMe');$('tg_bot').textContent='✅ @'+tgBot.username}}catch(e){tgMsg('Token no válido: '+e.message,1);return}
+ tgLinking=true;tgMsg('Esperando… abre @'+tgBot.username+' en tu Telegram y escríbele /start (tienes unos minutos).');tgLoop();
+ setTimeout(()=>{if(tgLinking){tgLinking=false;tgMsg('No llegó ningún mensaje. Vuelve a pulsar «Vincular mi chat».',1)}},180000)};
+$('tg_test').onclick=async()=>{if(!tgReady()){tgMsg('Falta el token o vincular el chat.',1);return}try{await tgSend('✅ Prueba desde el Simulador ECG: la conexión funciona.');tgMsg('Mensaje de prueba enviado a tu Telegram.')}catch(e){tgMsg('No se pudo enviar: '+e.message,1)}};
+$('tg_on').onclick=async()=>{if(TG.on){TG.on=false;saveTG();tgMsg('Interacción deshabilitada.');paintTG();return}
+ if(!tgReady()){tgMsg('Falta el token o vincular el chat.',1);return}
+ if(!await netCheck()){tgMsg('Sin internet.',1);return}
+ TG.on=true;saveTG();paintTG();tgMsg('Interacción habilitada. Escríbele a tu bot desde Telegram.');tgSend('🟢 Simulador ECG conectado. Escribe tu pregunta o /ayuda.').catch(()=>{});tgLoop()};
+async function tgSend(t){t=String(t);for(let i=0;i<t.length||i===0;i+=3900)await tgApi('sendMessage',{chat_id:TG.chat,text:t.slice(i,i+3900),disable_web_page_preview:true})}
+async function tgLoop(){if(tgRun)return;tgRun=true;
+ try{await tgApi('deleteWebhook',{}).catch(()=>{});const u0=await tgApi('getUpdates',{offset:-1,timeout:0});if(u0.length)tgOff=u0[u0.length-1].update_id+1}catch(e){}
+ while(TG.on||tgLinking){if(!NET){await sleep(3000);continue}
+  try{const ups=await tgApi('getUpdates',{offset:tgOff,timeout:25,allowed_updates:['message']},35000);for(const u of ups){tgOff=u.update_id+1;if(u.message)tgIn(u.message)}}
+  catch(e){if($('admModal').classList.contains('on'))tgMsg('Telegram: '+e.message,1);await sleep(4000)}}
+ tgRun=false}
+function tgIn(m){const id=String(m.chat.id),txt=(m.text||'').trim();
+ if(tgLinking){TG.chat=id;saveTG();tgLinking=false;tgMsg('✅ Chat vinculado con '+((m.from&&m.from.first_name)||id)+'. Ya puedes habilitar la interacción.');paintTG();tgSend('✅ Chat vinculado. Ahora puedes habilitar la interacción desde la ventana admin del simulador.').catch(()=>{});return}
+ if(id!==String(TG.chat)||!TG.on||!txt)return;tgCmd(txt).catch(e=>{})}
+const AYUDA='🫀 Simulador ECG · Tutor IA\n\nEscríbeme cualquier pregunta de electrocardiografía y te respondo con mi base de conocimiento.\n\nComandos:\n/estado · FC, diagnóstico y medidas actuales\n/captura · foto de la pantalla del simulador\n/casos · lista de casos\n/caso bradicardia · carga un caso en el simulador\n/fc 120 · cambia la frecuencia cardíaca\n/informe · te envío el informe de la sesión\n\nTambién puedes enseñarme: aprende: término = significado';
+function estadoTxt(){return 'FC '+Math.round(S.bpm)+' lpm · '+dx()+'\n'+measItems().map(([n,v,sv,w])=>({ok:'🟢',warn:'🟡',alert:'🔴',info:'⚪'}[sv])+' '+n+': '+v+' ('+w+')').join('\n')+(SES?'\n\nSesión de '+SES.name:'\n\nSin sesión de estudiante activa.')}
+function explTxt(){return $('xh').textContent+'\n'+$('xt').textContent}
+async function tgCmd(t){const w=t.split(/\s+/),c=w[0].toLowerCase().replace(/@.*/,''),arg=norm(t.slice(w[0].length)).trim();
+ if(c==='/start'||c==='/ayuda'||c==='/help')return tgSend(AYUDA);
+ if(c==='/estado')return tgSend(estadoTxt());
+ if(c==='/captura'||/^(captura|pantalla|captura de pantalla|foto)$/.test(norm(t).trim()))return tgPhoto('📸 Pantalla actual del simulador\n'+estadoCore());
+ if(c==='/casos')return tgSend('Casos disponibles:\n'+CASOS.map(x=>'• '+x[0]).join('\n')+'\n\nEjemplo: /caso bradicardia');
+ if(c==='/caso'){const k=CASOS.find(x=>norm(x[0])===arg)||CASOS.find(x=>norm(x[0]).includes(arg)&&arg);if(!k)return tgSend('No encontré ese caso. Usa /casos para ver la lista.');setS(k[1],k[0]);return tgSend('Caso «'+k[0]+'» cargado en el simulador. Te envío la captura en unos segundos…')}
+ if(c==='/fc'){const n=parseInt(arg,10);if(!(n>=30&&n<=200))return tgSend('Usa /fc seguido de un número entre 30 y 200. Ejemplo: /fc 120');S.bpm=n;onChange('bpm');return tgSend('Frecuencia ajustada a '+n+' lpm. Te envío la captura en unos segundos…')}
+ if(c==='/informe'){if(!SES)return tgSend('No hay una sesión de estudiante activa para reportar.');try{await tgSendReport();}catch(e){await tgSend('No pude enviar el informe: '+e.message)}return}
+ tgReply=true;setTimeout(()=>{tgReply=false},2500);
+ send(t);
+ setTimeout(()=>{if(SUG&&SUG.length)tgSend('Temas relacionados: '+SUG.map(k=>k.split('|')[0]).join(' · ')+'\n(escríbeme el tema que quieras ver)').catch(()=>{})},800)}
+/* ===== Espejo del chat, ajustes y capturas hacia Telegram ===== */
+let tgChain=Promise.resolve();const tgQ=t=>{tgChain=tgChain.then(()=>tgSend(t)).catch(()=>{})};
+function tgMirror(c,t,nolog){if(nolog||!TG.on||!tgReady()||!NET)return;
+ if(c==='u'){if(tgReply)return;tgQ('💻 '+(SES?first(SES.name):'Pantalla')+': '+t)}else tgQ(tgReply?t:'🤖 Tutor: '+t)}
+let TGBASE={...S},tgNT=null,tgCaso=null;
+function tgDiff(){const o=[];SL.forEach(([k,l,,,,f])=>{if(Math.abs(S[k]-TGBASE[k])>1e-9)o.push('• '+l+': '+f(TGBASE[k])+' → '+f(S[k]))});return o}
+function tgNotifySoon(){clearTimeout(tgNT);tgNT=setTimeout(tgNotify,2600)}
+function estadoCore(){return '📊 FC '+Math.round(S.bpm)+' lpm · '+dx()+'\n'+measItems().map(([n,v,sv,w])=>({ok:'🟢',warn:'🟡',alert:'🔴',info:'⚪'}[sv])+' '+n+': '+v+' ('+w+')').join('\n')}
+async function tgPhoto(cap){const img=renderSnap('Pantalla actual',1100,.8);if(!img){await tgSend(cap);return}
+ const f=new FormData();f.append('chat_id',TG.chat);f.append('caption',cap.slice(0,1000));f.append('photo',dataBlob(img),'pantalla.jpg');await tgApi('sendPhoto',f,60000,true);if(cap.length>1000)await tgSend(cap.slice(1000))}
+async function tgNotify(){if(!TG.on||!tgReady()||!NET){TGBASE={...S};tgCaso=null;return}
+ const d=tgDiff();if(!d.length&&!tgCaso)return;const al=alarmEval();
+ const cap=(tgCaso?'🧪 Caso «'+tgCaso+'» cargado\n':'⚙️ Ajustes modificados\n')+d.join('\n')+'\n\n'+estadoCore()+(al.lvl?'\n\n'+(al.lvl===2?'🚨 ALARMA activa: ':'⚠️ Alerta activa: ')+al.items.map(x=>x.txt).join('; '):'')+'\n\n'+explTxt();
+ TGBASE={...S};tgCaso=null;try{await tgPhoto(cap)}catch(e){}}
+
+/* informe → Telegram */
+const dataBlob=u=>{const b=atob(u.split(',')[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:'image/jpeg'})};
+async function tgSendReport(){if(!tgReady())throw new Error('Telegram sin configurar');if(!NET&&!await netCheck())throw new Error('sin internet');if(!SES)throw new Error('no hay sesión');
+ const f=new FormData();f.append('chat_id',TG.chat);f.append('caption',summaryTxt().slice(0,1000));f.append('document',new Blob([reportFile()],{type:'text/html'}),'Informe-ECG-'+slug(SES.name)+'.html');await tgApi('sendDocument',f,90000,true);
+ SES.sent=Date.now();saveNow()}
+function endTgUI(){const b=$('e_tg');b.classList.toggle('off',!tgReady());$('e_tgs').textContent=NET?'Se envía el informe con su resumen.':'Sin internet: inténtalo cuando haya conexión.';b.disabled=false}
+async function endSendTg(){const b=$('e_tg'),st=$('e_tgs');if(tgBusy)return;tgBusy=true;b.disabled=true;st.textContent='Enviando…';
+ try{await tgSendReport();st.textContent='✅ Informe enviado a Telegram.'}catch(e){st.textContent='❌ No se pudo enviar ('+e.message+'). Puedes reintentar.'}tgBusy=false;b.disabled=false}
+$('e_tg').onclick=endSendTg;
+paintTG();if(TG.on)netCheck().then(ok=>{if(ok)tgLoop()});
+
+/* inicio de sesión */
+function stuChip(){$('stuChip').textContent=SES?'👤 '+SES.name:''}
+function beginChat(){showMenu('inicio')}
+function startSession(){const n=$('s_name').value.trim(),m='';
+ if(n.length<3){$('s_err').textContent='Escribe tu nombre completo.';$('s_name').focus();return}
+ SES=newSes(n,m);saveNow();stuChip();$('startModal').classList.remove('on');beginChat()}
+$('s_go').onclick=startSession;$('s_name').onkeydown=e=>{if(e.key==='Enter')startSession()};
+function startFlow(){const sv=loadSes();
+ if(sv&&sv.name){SES=sv;stuChip();if(sv.end){openEnd();$('log').innerHTML='';sv.chat.forEach(m=>addMsg(m.r,m.x,true));return}
+  sv.chat.forEach(m=>addMsg(m.r,m.x,true));SES=null;addMsg('ai','Retomé tu sesión, '+first(sv.name)+'. Puedes continuar donde la dejaste.',true);showMenu('inicio');SES=sv}
+ else{$('startModal').classList.add('on');setTimeout(()=>$('s_name').focus(),50)}}
+
+/* ---------- Inicio ---------- */
+resize();refresh();showExplain({sev:'info',title:'Así se usa el simulador',text:'1) Elige un caso o mueve un control. 2) Mira cómo cambia el latido anotado (línea punteada = normal) y las 12 derivaciones. 3) Aquí leerás qué está pasando. Toca una derivación para ampliarla y preguntar al tutor.',ask:null});setCtx('default','general');startFlow();
+requestAnimationFrame(frame);
+</script></body></html>
