@@ -4,7 +4,6 @@ Simulador educativo de ECG de 12 derivaciones, en **un solo archivo HTML**, con 
 
 🔗 **Demo en línea:** https://jlo8952.github.io/simulador-ecg/
 
-![Pantalla general del simulador](docs/captura-general.png)
 
 ---
 
@@ -20,7 +19,6 @@ Simulador educativo de ECG de 12 derivaciones, en **un solo archivo HTML**, con 
 - **Sesión de aprendizaje:** registra el nombre del estudiante, el chat, los controles usados, los casos explorados y las capturas, y genera un **informe profesional** en HTML o PDF.
 - **Integración con Telegram sin servidor:** el docente ve el chat en espejo, recibe capturas con los parámetros modificados, alarmas e informes, y puede controlar el simulador con comandos.
 
-![Alarma de paciente en peligro](docs/captura-alarma.png)
 
 ---
 
@@ -79,7 +77,6 @@ Formato del archivo JSON (cada clave es el término, con sinónimos separados po
 
 Las respuestas pueden incluir `{nombre}`, `{bpm}`, `{peso}` y `{diag}`, que se reemplazan por los datos actuales del paciente simulado.
 
-![Ventana de administración](docs/captura-admin.png)
 
 ---
 
@@ -102,7 +99,6 @@ Se configura completamente desde *admin → pestaña Telegram*:
 
 ## 👥 Casos de uso
 
-![Diagrama de casos de uso](docs/casos-de-uso.png)
 
 ---
 
