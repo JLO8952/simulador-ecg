@@ -89,7 +89,7 @@ Se configura completamente desde *admin → pestaña Telegram*:
 3. Pulsa **Vincular mi chat** y escribe `/start` a tu bot.
 4. Envía un mensaje de prueba y, si quieres, activa el envío del informe al finalizar.
 
-**Qué recibes:** chat en espejo (💻 estudiante / 🤖 tutor), capturas con los parámetros modificados, alarmas con la condición del paciente y el informe al terminar la sesión.
+**Qué recibes:** chat en espejo (estudiante / tutor), capturas con los parámetros modificados, alarmas con la condición del paciente y el informe al terminar la sesión.
 
 **Comandos:** `/ayuda` · `/estado` · `/captura` · `/casos` · `/caso bradicardia` · `/fc 120` · `/informe`
 
@@ -97,7 +97,7 @@ Se configura completamente desde *admin → pestaña Telegram*:
 
 ---
 
-## 👥 Casos de uso
+##  Casos de uso
 
 
 ---
@@ -121,7 +121,7 @@ Se configura completamente desde *admin → pestaña Telegram*:
 
 ---
 
-## 📄 Licencia y autoría
+## Licencia y autoría
 
 Proyecto desarrollado por **John F Correa** con fines educativos.
 Agrega aquí tu licencia (por ejemplo MIT) y los datos de contacto o de la institución.
