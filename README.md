@@ -99,7 +99,45 @@ Se configura completamente desde *admin → pestaña Telegram*:
 
 ##  Casos de uso
 
+### Actores
 
+| Actor | Rol |
+|---|---|
+| **Estudiante** | Usuario principal. Practica, explora casos y pregunta al tutor. |
+| **Docente** | Administra el conocimiento del tutor y supervisa las sesiones. |
+| **Telegram (bot)** | Sistema externo que entrega al docente el chat, las capturas, las alarmas y el informe. |
+
+### Casos de uso del estudiante
+
+| Caso de uso | Descripción |
+|---|---|
+| Iniciar sesión | Ingresa su nombre y comienza a registrarse su actividad. |
+| Completar la ficha del paciente | Escribe edad, peso, altura, presión y antecedentes del paciente simulado. |
+| Elegir un caso | Carga un ECG predefinido (bradicardia, taquicardia, QRS ancho, etc.). |
+| Ajustar los controles de onda | Modifica FC, ondas P, QRS y T, ganancia, velocidad y línea base, y ve cómo cambia la señal. |
+| Consultar al Tutor IA | Hace preguntas en el chat o elige una pregunta sugerida. |
+| Ver la alarma de paciente en peligro | Recibe un aviso visual, con banner y luces, cuando la señal es de riesgo. |
+| Finalizar la sesión | Obtiene el informe en HTML o PDF, o lo envía por Telegram. |
+
+### Casos de uso del docente
+
+| Caso de uso | Descripción |
+|---|---|
+| Administrar la base de conocimiento | Busca, edita, agrega o borra términos del tutor. |
+| Importar y exportar JSON | Amplía la base con archivos o saca una copia de seguridad. |
+| Enseñar al tutor | Agrega conocimiento con `aprende: término = significado`. |
+| Abrir el laboratorio de IA | Muestra cómo funcionan las dos redes neuronales. |
+| Configurar Telegram | Conecta su bot desde la ventana de administración. |
+| Recibir chat, capturas y alarmas | Sigue la sesión desde el celular en tiempo real. |
+| Controlar con comandos | Usa `/caso`, `/fc`, `/captura`, `/estado` e `/informe` desde Telegram. |
+
+### Escenarios de uso
+
+- **Clase presencial:** el docente proyecta el simulador, cambia casos y los estudiantes preguntan al tutor.
+- **Estudio individual:** el estudiante practica por su cuenta, sin internet, y al final descarga el informe.
+- **Práctica supervisada:** el docente sigue desde Telegram lo que hace cada estudiante y recibe las alarmas.
+- **Capacitación de técnicos de mantenimiento:** se explican el equipo, la calibración, la velocidad del papel y las derivaciones.
+- **Evaluación:** el informe con el chat, los controles usados y las capturas sirve para revisar lo que practicó cada persona.
 ---
 
 ## Tecnología
