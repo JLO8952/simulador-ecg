@@ -1,8 +1,8 @@
 # Simulador de Electrocardiografía con Tutor IA
 
-Simulador educativo de ECG de 12 derivaciones, en **un solo archivo HTML**, con un tutor de inteligencia artificial que funciona **sin internet**. Está pensado para personas que no conocen el equipo, para estudiantes de áreas biomédicas y para técnicos de mantenimiento de electrocardiógrafos.
+Simulador educativo de ECG de 12 derivaciones,  con un tutor de inteligencia artificial que funciona sin internet. Está pensado para personas que no conocen el equipo, para estudiantes de áreas biomédicas y para técnicos de mantenimiento de electrocardiógrafos.
 
-🔗 **Demo en línea:** https://jlo8952.github.io/simulador-ecg/
+https://jlo8952.github.io/simulador-ecg/
 
 
 ---
